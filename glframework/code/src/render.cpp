@@ -18,6 +18,9 @@ std::vector< glm::vec3 > normals;
 
 glm::vec3 lightPos;
 
+glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+
+
 
 extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_vertices,
@@ -29,6 +32,9 @@ extern bool loadOBJ(const char * path,
 
 bool show_test_window = false;
 
+glm::vec3 ObjectColor(0.f, 0.f, 0.f);
+glm::vec3 LightColor(0.f, 0.f, 0.f);
+
 
 void GUI() {
 	bool show = true;
@@ -37,8 +43,8 @@ void GUI() {
 	// Do your GUI code here....
 	{
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
-
-
+		ImGui::ColorEdit3("Light Color", &LightColor.x);
+		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
 	
 
 
@@ -77,10 +83,7 @@ namespace MyLoadedModel {
 }
 
 
-
-
 ////////////////
-
 namespace RenderVars {
 	const float FOV = glm::radians(50.f);
 	const float zNear = 1.f;
@@ -154,7 +157,9 @@ void GLinit(int width, int height) {
 	MyLoadedModel::setupModel();
 
 	lightPos =  glm::vec3(40, 40, 0);
+	
 
+	
 	
 
 
@@ -184,14 +189,9 @@ void GLrender(float dt) {
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
-
-
-	
-		lightPos = glm::vec3(40 , 60, 0);
+	lightPos = glm::vec3(40 , 60, 0);
 
 	MyLoadedModel::drawModel();
-
-	
 
 	ImGui::Render();
 }
@@ -427,8 +427,6 @@ namespace MyLoadedModel {
 	GLuint modelProgram;
 	glm::mat4 objMat = glm::mat4(1.f);
 
-
-	
 	const char* model_vertShader =
 		"#version 330\n\
 	in vec3 in_Position;\n\
@@ -445,14 +443,19 @@ namespace MyLoadedModel {
 
 
 	const char* model_fragShader =
-		"#version 330\n\
-in vec4 vert_Normal;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 color;\n\
-void main() {\n\
-	out_Color = vec4(color.xyz * dot(vert_Normal, vec4(1.0, 1.0, 1.0, 1.0)) , 1.0 );\n\
-}";
+	"#version 330\n\
+	in vec4 vert_Normal;\n\
+	out vec4 out_Color;\n\
+	uniform mat4 mv_Mat;\n\
+	uniform vec3 LightColor; \n\
+	uniform vec3 ObjectColor; \n\
+	void main() {\n\
+		float ambientStrength = 5.0;\n\
+		vec3 ambient = ambientStrength * LightColor;\n\
+		vec3 result = ambient * ObjectColor;\n\
+		out_Color = vec4(result, 1.0); \n\
+	}";
+
 	void setupModel() {
 		glGenVertexArrays(1, &modelVao);
 		glBindVertexArray(modelVao);
@@ -506,8 +509,8 @@ void main() {\n\
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		glUniform3f(glGetUniformLocation(modelProgram, "lPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform4f(glGetUniformLocation(modelProgram, "color"), 1.f, 1.f, 0.f, 0.f);
-	
+		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
 		glDrawArrays(GL_TRIANGLES, 0, 10000);
 
 
