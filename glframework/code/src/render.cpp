@@ -3,22 +3,24 @@
 #include <glm\gtc\matrix_transform.hpp>
 #include <cstdio>
 #include <cassert>
-
+#include <glm/gtc/matrix_transform.hpp> // lookAt
 #include "GL_framework.h"
 #include <vector>
 
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
+#include <iostream>
 //variables to load an object:
 
 std::vector< glm::vec3 > vertices;
 std::vector< glm::vec2 > uvs;
 std::vector< glm::vec3 > normals;
+float lightValuesPos[3] = {0.f,0.f,0.f};
+float colorValues[4] = { 1.f, 1.f, 0.f, 0.f };
+float CameraPosition[3] = { 0.f, -20.f, -50.f };
+float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
 
-
-glm::vec3 lightPos;
-
-glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+glm::vec3 lightPos = { 40, 40, 0 };
 
 
 
@@ -28,12 +30,21 @@ extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_normals
 );
 
+struct Camera
+{
+	glm::vec3 mCenter;
+	glm::vec3 mEye;
+	glm::mat4x4 mMatrix = {  };
+	glm::vec3 mUp;
 
+	void Update() {
+		glm::translate(mMatrix, mUp);
+	}
+};
 
+Camera cm;
 bool show_test_window = false;
-
-glm::vec3 ObjectColor(0.f, 0.f, 0.f);
-glm::vec3 LightColor(0.f, 0.f, 0.f);
+static float f1 = 1.00f;
 
 
 void GUI() {
@@ -43,11 +54,17 @@ void GUI() {
 	// Do your GUI code here....
 	{
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
-		ImGui::ColorEdit3("Light Color", &LightColor.x);
-		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
+
+
 	
 
+		}
+		if (ImGui::DragFloat3("Camera Movement", { CameraPosition }, 0.05f)) {
 
+		}
+		if (ImGui::Button("Dolly Click")) {
+			cm.Update();
+		}
 	}
 	// .........................
 
@@ -149,15 +166,12 @@ void GLinit(int width, int height) {
 	RV::_projection = glm::perspective(RV::FOV, (float)width/(float)height, RV::zNear, RV::zFar);
 
 	// Setup shaders & geometry
-	/*Box::setupCube();
-	Axis::setupAxis();*/
 
 	bool res = loadOBJ("kirby.obj", vertices, uvs, normals);
 
 	MyLoadedModel::setupModel();
 
 	lightPos =  glm::vec3(40, 40, 0);
-	
 
 	
 	
@@ -183,13 +197,16 @@ void GLrender(float dt) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	RV::_modelView = glm::mat4(1.f);
-	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(RV::panv[0], RV::panv[1], RV::panv[2]));
+	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(CameraPosition[0], CameraPosition[1], CameraPosition[2]));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
-	lightPos = glm::vec3(40 , 60, 0);
+
+
+	
+		lightPos = glm::vec3(40 , 60, 0);
 
 	MyLoadedModel::drawModel();
 
@@ -420,6 +437,7 @@ void drawAxis() {
 }
 
 ////////////////////////////////////////////////// MyModel
+
 namespace MyLoadedModel {
 	GLuint modelVao;
 	GLuint modelVbo[3];
@@ -443,19 +461,14 @@ namespace MyLoadedModel {
 
 
 	const char* model_fragShader =
-	"#version 330\n\
-	in vec4 vert_Normal;\n\
-	out vec4 out_Color;\n\
-	uniform mat4 mv_Mat;\n\
-	uniform vec3 LightColor; \n\
-	uniform vec3 ObjectColor; \n\
-	void main() {\n\
-		float ambientStrength = 5.0;\n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		vec3 result = ambient * ObjectColor;\n\
-		out_Color = vec4(result, 1.0); \n\
-	}";
-
+		"#version 330\n\
+in vec4 vert_Normal;\n\
+out vec4 out_Color;\n\
+uniform mat4 mv_Mat;\n\
+uniform vec4 color;\n\
+void main() {\n\
+	out_Color = vec4(color.xyz * dot(vert_Normal, vec4(1.0, 1.0, 1.0, 1.0)) , 1.0 );\n\
+}";
 	void setupModel() {
 		glGenVertexArrays(1, &modelVao);
 		glBindVertexArray(modelVao);
@@ -509,8 +522,8 @@ namespace MyLoadedModel {
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		glUniform3f(glGetUniformLocation(modelProgram, "lPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform4f(glGetUniformLocation(modelProgram, "color"), 1.f, 1.f, 0.f, 0.f);
+	
 		glDrawArrays(GL_TRIANGLES, 0, 10000);
 
 
@@ -521,3 +534,46 @@ namespace MyLoadedModel {
 
 
 }
+
+glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+
+
+
+glm::vec3 ObjectColor(0.f, 0.f, 0.f);
+glm::vec3 LightColor(0.f, 0.f, 0.f);
+
+
+		ImGui::ColorEdit3("Light Color", &LightColor.x);
+		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
+	
+		ImGui::DragFloat("drag float", &f1, 0.005f);
+		if (ImGui::Button("Click")) {
+
+		}
+
+		if (ImGui::DragFloat3("Light Position", { lightValuesPos }, 5.f)) {
+			lightPos.x = lightValuesPos[0];
+			lightPos.y = lightValuesPos[1];
+			lightPos.z = lightValuesPos[2];
+		}		
+		if (ImGui::DragFloat3("Color Kirby", { colorValues }, 0.05f)) {
+	lightPos =  glm::vec3(40, 40, 0);
+	
+	lightPos = glm::vec3(40 , 60, 0);
+
+	"#version 330\n\
+	in vec4 vert_Normal;\n\
+	out vec4 out_Color;\n\
+	uniform mat4 mv_Mat;\n\
+	uniform vec3 LightColor; \n\
+	uniform vec3 ObjectColor; \n\
+	void main() {\n\
+		float ambientStrength = 5.0;\n\
+		vec3 ambient = ambientStrength * LightColor;\n\
+		vec3 result = ambient * ObjectColor;\n\
+		out_Color = vec4(result, 1.0); \n\
+	}";
+
+		glUniform3f(glGetUniformLocation(modelProgram, "lPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
