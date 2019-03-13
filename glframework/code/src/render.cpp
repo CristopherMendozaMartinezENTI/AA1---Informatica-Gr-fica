@@ -15,13 +15,11 @@
 std::vector< glm::vec3 > vertices;
 std::vector< glm::vec2 > uvs;
 std::vector< glm::vec3 > normals;
+
 float lightValuesPos[3] = {0.f,0.f,0.f};
 float colorValues[4] = { 1.f, 1.f, 0.f, 0.f };
-float CameraPosition[3] = { 0.f, -20.f, -50.f };
+float CameraPosition[3] = { 0.f, -2.f, -26.f };
 float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
-
-glm::vec3 lightPos = { 40, 40, 0 };
-
 
 
 extern bool loadOBJ(const char * path,
@@ -44,7 +42,6 @@ struct Camera
 
 Camera cm;
 bool show_test_window = false;
-static float f1 = 1.00f;
 
 glm::vec3 ObjectColor(0.f, 0.f, 0.f);
 glm::vec3 LightColor(0.f, 0.f, 0.f);
@@ -56,7 +53,6 @@ void GUI() {
 	ImGui::Begin("Simulation Parameters", &show, 0);
 
 	// Do your GUI code here....
-	
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
 		ImGui::ColorEdit3("Light Color", &LightColor.x);
@@ -64,21 +60,10 @@ void GUI() {
 		ImGui::DragFloat3("Light Pos", &lightPos.x);
 		ImGui::DragFloat3("View Pos", &ViewPos.x);
 
-		ImGui::DragFloat("drag float", &f1, 0.005f);
-
-		if (ImGui::Button("Click")) {
-
-		}
-
-		if (ImGui::DragFloat3("Light Position", { lightValuesPos }, 5.f)) {
-			lightPos.x = lightValuesPos[0];
-			lightPos.y = lightValuesPos[1];
-			lightPos.z = lightValuesPos[2];
-		}
-
 		if (ImGui::DragFloat3("Camera Movement", { CameraPosition }, 0.05f)) {
 
 		}
+
 		if (ImGui::Button("Dolly Click")) {
 			cm.Update();
 		}
