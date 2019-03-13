@@ -22,15 +22,6 @@ float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
 
 glm::vec3 lightPos = { 40, 40, 0 };
 
-glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
-
-
-
-glm::vec3 ObjectColor(0.f, 0.f, 0.f);
-glm::vec3 LightColor(0.f, 0.f, 0.f);
-
-
-
 
 
 extern bool loadOBJ(const char * path,
@@ -55,6 +46,10 @@ Camera cm;
 bool show_test_window = false;
 static float f1 = 1.00f;
 
+glm::vec3 ObjectColor(0.f, 0.f, 0.f);
+glm::vec3 LightColor(0.f, 0.f, 0.f);
+glm::vec3 lightPos(0.f, 0.f, 0.f);
+glm::vec3 ViewPos(0.f, 0.f, 0.f);
 
 void GUI() {
 	bool show = true;
@@ -66,6 +61,8 @@ void GUI() {
 
 		ImGui::ColorEdit3("Light Color", &LightColor.x);
 		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
+		ImGui::DragFloat3("Light Pos", &lightPos.x);
+		ImGui::DragFloat3("View Pos", &ViewPos.x);
 
 		ImGui::DragFloat("drag float", &f1, 0.005f);
 
@@ -191,7 +188,16 @@ void GLinit(int width, int height) {
 
 	MyLoadedModel::setupModel();
 
-	lightPos =  glm::vec3(40, 40, 0);
+	
+
+	
+	
+
+
+
+
+
+
 }
 
 void GLcleanup() {
@@ -214,13 +220,7 @@ void GLrender(float dt) {
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
-
-
-	
-	lightPos = glm::vec3(40 , 60, 0);
-
 	MyLoadedModel::drawModel();
-
 	ImGui::Render();
 }
 
@@ -457,31 +457,47 @@ namespace MyLoadedModel {
 	glm::mat4 objMat = glm::mat4(1.f);
 
 	const char* model_vertShader =
-		"#version 330\n\
+	"#version 330\n\
 	in vec3 in_Position;\n\
 	in vec3 in_Normal;\n\
-	uniform vec3 lPos;\n\
+	uniform vec3 lightPos;\n\
 	out vec4 vert_Normal;\n\
+	out vec3 Normal; \n\
+	out vec3 FragPos; \n\
 	uniform mat4 objMat;\n\
 	uniform mat4 mv_Mat;\n\
 	uniform mat4 mvpMat;\n\
 	void main() {\n\
 		gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
+		FragPos = vec3(objMat * vec4(in_Position, 1.0)); \n\
+		Normal = in_Normal;  \n\
 	}";
 
 
 	const char* model_fragShader =
 		"#version 330\n\
 	in vec4 vert_Normal;\n\
+	in vec3 FragPos; \n\
 	out vec4 out_Color;\n\
+	out vec3 Normal; \n\
 	uniform mat4 mv_Mat;\n\
 	uniform vec3 LightColor; \n\
 	uniform vec3 ObjectColor; \n\
+	uniform vec3 lightPos; \n\
+	uniform vec3 viewPos; \n\
 	void main() {\n\
-		float ambientStrength = 5.0;\n\
+		float ambientStrength = 1.0;\n\
 		vec3 ambient = ambientStrength * LightColor;\n\
-		vec3 result = ambient * ObjectColor;\n\
+		vec3 norm = normalize(Normal); \n\
+		vec3 lightDir = normalize(lightPos - FragPos); \n\
+		float diff = max(dot(norm, lightDir), 0.0); \n\
+		vec3 diffuse = diff * LightColor; \n\
+		float specularStrength = 0.5; \n\
+		vec3 viewDir = normalize(viewPos - FragPos); \n\
+ 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
+		float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32); \n\
+		vec3 specular = specularStrength * spec * LightColor; \n\
+		vec3 result = (ambient + diffuse + specular) * ObjectColor; \n\
 		out_Color = vec4(result, 1.0); \n\
 	}";
 
@@ -501,8 +517,6 @@ namespace MyLoadedModel {
 		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
-
-	
 
 		glBindVertexArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -537,12 +551,12 @@ namespace MyLoadedModel {
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform3f(glGetUniformLocation(modelProgram, "lPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-	
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
 		glDrawArrays(GL_TRIANGLES, 0, 10000);
-
+		
 
 		glUseProgram(0);
 		glBindVertexArray(0);
