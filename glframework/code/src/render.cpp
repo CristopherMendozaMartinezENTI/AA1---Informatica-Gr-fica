@@ -22,6 +22,15 @@ float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
 
 glm::vec3 lightPos = { 40, 40, 0 };
 
+glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+
+
+
+glm::vec3 ObjectColor(0.f, 0.f, 0.f);
+glm::vec3 LightColor(0.f, 0.f, 0.f);
+
+
+
 
 
 extern bool loadOBJ(const char * path,
@@ -52,20 +61,31 @@ void GUI() {
 	ImGui::Begin("Simulation Parameters", &show, 0);
 
 	// Do your GUI code here....
-	{
+	
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
+		ImGui::ColorEdit3("Light Color", &LightColor.x);
+		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
 
-	
+		ImGui::DragFloat("drag float", &f1, 0.005f);
+
+		if (ImGui::Button("Click")) {
 
 		}
+
+		if (ImGui::DragFloat3("Light Position", { lightValuesPos }, 5.f)) {
+			lightPos.x = lightValuesPos[0];
+			lightPos.y = lightValuesPos[1];
+			lightPos.z = lightValuesPos[2];
+		}
+
 		if (ImGui::DragFloat3("Camera Movement", { CameraPosition }, 0.05f)) {
 
 		}
 		if (ImGui::Button("Dolly Click")) {
 			cm.Update();
 		}
-	}
+	
 	// .........................
 
 	ImGui::End();
@@ -172,15 +192,6 @@ void GLinit(int width, int height) {
 	MyLoadedModel::setupModel();
 
 	lightPos =  glm::vec3(40, 40, 0);
-
-	
-	
-
-
-
-
-
-
 }
 
 void GLcleanup() {
@@ -206,7 +217,7 @@ void GLrender(float dt) {
 
 
 	
-		lightPos = glm::vec3(40 , 60, 0);
+	lightPos = glm::vec3(40 , 60, 0);
 
 	MyLoadedModel::drawModel();
 
@@ -462,13 +473,18 @@ namespace MyLoadedModel {
 
 	const char* model_fragShader =
 		"#version 330\n\
-in vec4 vert_Normal;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 color;\n\
-void main() {\n\
-	out_Color = vec4(color.xyz * dot(vert_Normal, vec4(1.0, 1.0, 1.0, 1.0)) , 1.0 );\n\
-}";
+	in vec4 vert_Normal;\n\
+	out vec4 out_Color;\n\
+	uniform mat4 mv_Mat;\n\
+	uniform vec3 LightColor; \n\
+	uniform vec3 ObjectColor; \n\
+	void main() {\n\
+		float ambientStrength = 5.0;\n\
+		vec3 ambient = ambientStrength * LightColor;\n\
+		vec3 result = ambient * ObjectColor;\n\
+		out_Color = vec4(result, 1.0); \n\
+	}";
+
 	void setupModel() {
 		glGenVertexArrays(1, &modelVao);
 		glBindVertexArray(modelVao);
@@ -522,7 +538,8 @@ void main() {\n\
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		glUniform3f(glGetUniformLocation(modelProgram, "lPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform4f(glGetUniformLocation(modelProgram, "color"), 1.f, 1.f, 0.f, 0.f);
+		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
 	
 		glDrawArrays(GL_TRIANGLES, 0, 10000);
 
@@ -535,45 +552,7 @@ void main() {\n\
 
 }
 
-glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
 
 
 
-glm::vec3 ObjectColor(0.f, 0.f, 0.f);
-glm::vec3 LightColor(0.f, 0.f, 0.f);
 
-
-		ImGui::ColorEdit3("Light Color", &LightColor.x);
-		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
-	
-		ImGui::DragFloat("drag float", &f1, 0.005f);
-		if (ImGui::Button("Click")) {
-
-		}
-
-		if (ImGui::DragFloat3("Light Position", { lightValuesPos }, 5.f)) {
-			lightPos.x = lightValuesPos[0];
-			lightPos.y = lightValuesPos[1];
-			lightPos.z = lightValuesPos[2];
-		}		
-		if (ImGui::DragFloat3("Color Kirby", { colorValues }, 0.05f)) {
-	lightPos =  glm::vec3(40, 40, 0);
-	
-	lightPos = glm::vec3(40 , 60, 0);
-
-	"#version 330\n\
-	in vec4 vert_Normal;\n\
-	out vec4 out_Color;\n\
-	uniform mat4 mv_Mat;\n\
-	uniform vec3 LightColor; \n\
-	uniform vec3 ObjectColor; \n\
-	void main() {\n\
-		float ambientStrength = 5.0;\n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		vec3 result = ambient * ObjectColor;\n\
-		out_Color = vec4(result, 1.0); \n\
-	}";
-
-		glUniform3f(glGetUniformLocation(modelProgram, "lPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
