@@ -43,10 +43,35 @@ struct Camera
 Camera cm;
 bool show_test_window = false;
 
-glm::vec3 ObjectColor(0.f, 0.f, 0.f);
-glm::vec3 LightColor(0.f, 0.f, 0.f);
-glm::vec3 lightPos(0.f, 0.f, 0.f);
-glm::vec3 ViewPos(0.f, 0.f, 0.f);
+glm::vec3 LightColor(1.f, 1.f, 1.f);
+glm::vec3 ObjectColor(0.5f, 0.1f, 0.1f);
+glm::vec3 lightPos(41.f, 23.f, 27.f);
+glm::vec3 ViewPos(-36.9f, -1.f, 98.f);
+float ambientStrength = 1.0f;
+float specularStrength = 1.0f;
+float FOV;
+
+namespace RenderVars {
+	float FOV = glm::radians(50.f);
+	const float zNear = 1.f;
+	const float zFar = 500.f;
+
+	glm::mat4 _projection;
+	glm::mat4 _modelView;
+	glm::mat4 _MVP;
+	glm::mat4 _inv_modelview;
+	glm::vec4 _cameraPoint;
+
+	struct prevMouse {
+		float lastx, lasty;
+		MouseEvent::Button button = MouseEvent::Button::None;
+		bool waspressed = false;
+	} prevMouse;
+
+	float panv[3] = { 0.f, -20.f, -50.f };
+	float rota[2] = { 0.f, 0.f };
+}
+namespace RV = RenderVars;
 
 void GUI() {
 	bool show = true;
@@ -55,10 +80,12 @@ void GUI() {
 	// Do your GUI code here....
 		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
+		ImGui::DragFloat("Ambient Strength", &ambientStrength, 0.1f);
+		ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
 		ImGui::ColorEdit3("Light Color", &LightColor.x);
 		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
 		ImGui::DragFloat3("Light Pos", &lightPos.x);
-		ImGui::DragFloat3("View Pos", &ViewPos.x);
+		ImGui::DragFloat("FOV", &FOV);
 
 		if (ImGui::DragFloat3("Camera Movement", { CameraPosition }, 0.05f)) {
 
@@ -69,7 +96,6 @@ void GUI() {
 		}
 	
 	// .........................
-
 	ImGui::End();
 
 	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
@@ -101,30 +127,7 @@ namespace MyLoadedModel {
 	void drawModel();
 }
 
-
 ////////////////
-namespace RenderVars {
-	const float FOV = glm::radians(50.f);
-	const float zNear = 1.f;
-	const float zFar = 500.f;
-
-	glm::mat4 _projection;
-	glm::mat4 _modelView;
-	glm::mat4 _MVP;
-	glm::mat4 _inv_modelview;
-	glm::vec4 _cameraPoint;
-
-	struct prevMouse {
-		float lastx, lasty;
-		MouseEvent::Button button = MouseEvent::Button::None;
-		bool waspressed = false;
-	} prevMouse;
-
-	float panv[3] = { 0.f, -20.f, -50.f };
-	float rota[2] = { 0.f, 0.f };
-}
-namespace RV = RenderVars;
-
 void GLResize(int width, int height) {
 	glViewport(0, 0, width, height);
 	if(height != 0) RV::_projection = glm::perspective(RV::FOV, (float)width / (float)height, RV::zNear, RV::zFar);
@@ -173,26 +176,14 @@ void GLinit(int width, int height) {
 
 	MyLoadedModel::setupModel();
 	Box::setupCube();
+	//Cube::setup();
 	
-
-	
-	
-
-
-
-
-
-
 }
 
 void GLcleanup() {
 	Box::cleanupCube();
 	Axis::cleanupAxis();
 	MyLoadedModel::cleanupModel();
-
-	
-
-
 }
 
 //void GLrender(double currentTime) {
@@ -206,8 +197,11 @@ void GLrender(float dt) {
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
+
 	MyLoadedModel::drawModel();
 	Box::drawCube();
+	//Cube::draw();
+
 
 	ImGui::Render();
 }
@@ -243,6 +237,7 @@ void linkProgram(GLuint program) {
 		delete[] buff;
 	}
 }
+
 
 ////////////////////////////////////////////////// BOX
 namespace Box{
@@ -281,8 +276,9 @@ namespace Box{
 	"#version 330\n\
 	out vec4 out_Color;\n\
 	uniform vec4 color;\n\
+	uniform mat4 vert_Normal; \n\
 	void main() {\n\
-		out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
+		out_Color = color; \n\
 	}";
 
 	void setupCube() {
@@ -323,8 +319,9 @@ namespace Box{
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RV::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		// FLOOR
-		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.6f, 0.6f, 0.6f, 1.f);
+		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.0f, 0.0f, 0.0f, 1.f);
 		glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, 0);
 		// WALLS
 		glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_BYTE, (void*)(sizeof(GLubyte) * 4));
@@ -336,151 +333,6 @@ namespace Box{
 		glBindVertexArray(0);
 	}
 }
-
-namespace Cube {
-	GLuint cubeVao;
-	GLuint cubeVbo[3];
-	GLuint cubeShaders[2];
-	GLuint cubeProgram;
-	glm::mat4 objMat = glm::mat4(1.f);
-
-	extern const float halfW = 0.5f;
-	int numVerts = 24 + 6; // 4 vertex/face * 6 faces + 6 PRIMITIVE RESTART
-
-						   //   4---------7
-						   //  /|        /|
-						   // / |       / |
-						   //5---------6  |
-						   //|  0------|--3
-						   //| /       | /
-						   //|/        |/
-						   //1---------2
-	glm::vec3 verts[] = {
-		glm::vec3(-halfW, -halfW, -halfW),
-		glm::vec3(-halfW, -halfW,  halfW),
-		glm::vec3(halfW, -halfW,  halfW),
-		glm::vec3(halfW, -halfW, -halfW),
-		glm::vec3(-halfW,  halfW, -halfW),
-		glm::vec3(-halfW,  halfW,  halfW),
-		glm::vec3(halfW,  halfW,  halfW),
-		glm::vec3(halfW,  halfW, -halfW)
-	};
-	glm::vec3 norms[] = {
-		glm::vec3(0.f, -1.f,  0.f),
-		glm::vec3(0.f,  1.f,  0.f),
-		glm::vec3(-1.f,  0.f,  0.f),
-		glm::vec3(1.f,  0.f,  0.f),
-		glm::vec3(0.f,  0.f, -1.f),
-		glm::vec3(0.f,  0.f,  1.f)
-	};
-
-	glm::vec3 cubeVerts[] = {
-		verts[1], verts[0], verts[2], verts[3],
-		verts[5], verts[6], verts[4], verts[7],
-		verts[1], verts[5], verts[0], verts[4],
-		verts[2], verts[3], verts[6], verts[7],
-		verts[0], verts[4], verts[3], verts[7],
-		verts[1], verts[2], verts[5], verts[6]
-	};
-	glm::vec3 cubeNorms[] = {
-		norms[0], norms[0], norms[0], norms[0],
-		norms[1], norms[1], norms[1], norms[1],
-		norms[2], norms[2], norms[2], norms[2],
-		norms[3], norms[3], norms[3], norms[3],
-		norms[4], norms[4], norms[4], norms[4],
-		norms[5], norms[5], norms[5], norms[5]
-	};
-	GLubyte cubeIdx[] = {
-		0, 1, 2, 3, UCHAR_MAX,
-		4, 5, 6, 7, UCHAR_MAX,
-		8, 9, 10, 11, UCHAR_MAX,
-		12, 13, 14, 15, UCHAR_MAX,
-		16, 17, 18, 19, UCHAR_MAX,
-		20, 21, 22, 23, UCHAR_MAX
-	};
-
-	const char* cube_vertShader =
-		"#version 330\n\
-in vec3 in_Position;\n\
-in vec3 in_Normal;\n\
-out vec4 vert_Normal;\n\
-uniform mat4 objMat;\n\
-uniform mat4 mv_Mat;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-	vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-}";
-	const char* cube_fragShader =
-		"#version 330\n\
-in vec4 vert_Normal;\n\
-out vec4 out_Color;\n\
-uniform mat4 mv_Mat;\n\
-uniform vec4 color;\n\
-void main() {\n\
-	out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
-}";
-	void setupCube() {
-		glGenVertexArrays(1, &cubeVao);
-		glBindVertexArray(cubeVao);
-		glGenBuffers(3, cubeVbo);
-
-		glBindBuffer(GL_ARRAY_BUFFER, cubeVbo[0]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVerts), cubeVerts, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(0);
-
-		glBindBuffer(GL_ARRAY_BUFFER, cubeVbo[1]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(cubeNorms), cubeNorms, GL_STATIC_DRAW);
-		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(1);
-
-		glPrimitiveRestartIndex(UCHAR_MAX);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeVbo[2]);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIdx), cubeIdx, GL_STATIC_DRAW);
-
-		glBindVertexArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, 0);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-		cubeShaders[0] = compileShader(cube_vertShader, GL_VERTEX_SHADER, "cubeVert");
-		cubeShaders[1] = compileShader(cube_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
-
-		cubeProgram = glCreateProgram();
-		glAttachShader(cubeProgram, cubeShaders[0]);
-		glAttachShader(cubeProgram, cubeShaders[1]);
-		glBindAttribLocation(cubeProgram, 0, "in_Position");
-		glBindAttribLocation(cubeProgram, 1, "in_Normal");
-		linkProgram(cubeProgram);
-	}
-	void cleanupCube() {
-		glDeleteBuffers(3, cubeVbo);
-		glDeleteVertexArrays(1, &cubeVao);
-
-		glDeleteProgram(cubeProgram);
-		glDeleteShader(cubeShaders[0]);
-		glDeleteShader(cubeShaders[1]);
-	}
-	void updateCube(const glm::mat4& transform) {
-		objMat = transform;
-	}
-	void drawCube() {
-		glEnable(GL_PRIMITIVE_RESTART);
-		glBindVertexArray(cubeVao);
-		glUseProgram(cubeProgram);
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.1f, 1.f, 1.f, 0.f);
-		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
-
-		glUseProgram(0);
-		glBindVertexArray(0);
-		glDisable(GL_PRIMITIVE_RESTART);
-	}
-}
-
-/////////////////////////////////////////////////
 
 
 ////////////////////////////////////////////////// AXIS
@@ -602,13 +454,14 @@ namespace MyLoadedModel {
 	uniform mat4 mvpMat;\n\
 	void main() {\n\
 		gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
 		FragPos = vec3(objMat * vec4(in_Position, 1.0)); \n\
-		Normal = in_Normal;  \n\
+		Normal = in_Normal; \n\
 	}";
 
 
 	const char* model_fragShader =
-		"#version 330\n\
+	"#version 330\n\
 	in vec4 vert_Normal;\n\
 	in vec3 FragPos; \n\
 	out vec4 out_Color;\n\
@@ -618,18 +471,21 @@ namespace MyLoadedModel {
 	uniform vec3 ObjectColor; \n\
 	uniform vec3 lightPos; \n\
 	uniform vec3 viewPos; \n\
+	uniform float ambientStrength;\n\
+	uniform float specularStrength; \n\
 	void main() {\n\
-		float ambientStrength = 1.0;\n\
 		vec3 ambient = ambientStrength * LightColor;\n\
+		\n\
 		vec3 norm = normalize(Normal); \n\
 		vec3 lightDir = normalize(lightPos - FragPos); \n\
 		float diff = max(dot(norm, lightDir), 0.0); \n\
 		vec3 diffuse = diff * LightColor; \n\
-		float specularStrength = 0.5; \n\
+		\n\
 		vec3 viewDir = normalize(viewPos - FragPos); \n\
  		vec3 reflectDir = reflect(-lightDir, norm);	\n\
 		float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32); \n\
 		vec3 specular = specularStrength * spec * LightColor; \n\
+		\n\
 		vec3 result = (ambient + diffuse + specular) * ObjectColor; \n\
 		out_Color = vec4(result, 1.0); \n\
 	}";
@@ -687,7 +543,9 @@ namespace MyLoadedModel {
 		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), RenderVars::rota[0], RenderVars::rota[1], RenderVars::FOV);
+		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glDrawArrays(GL_TRIANGLES, 0, 10000);
 		
 
@@ -695,7 +553,6 @@ namespace MyLoadedModel {
 		glBindVertexArray(0);
 
 	}
-
 
 }
 
