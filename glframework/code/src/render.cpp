@@ -18,7 +18,7 @@ std::vector< glm::vec3 > normals;
 
 float lightValuesPos[3] = {0.f,0.f,0.f};
 float colorValues[4] = { 1.f, 1.f, 0.f, 0.f };
-float CameraPosition[3] = { 0.f, -2.f, -26.f };
+float CameraPosition[3] = { 0.f, -2.f, -24.f };
 float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
 
 
@@ -43,12 +43,12 @@ struct Camera
 Camera cm;
 bool show_test_window = false;
 
-glm::vec3 LightColor(1.f, 1.f, 1.f);
-glm::vec3 ObjectColor(0.5f, 0.1f, 0.1f);
-glm::vec3 lightPos(41.f, 23.f, 27.f);
-glm::vec3 ViewPos(-36.9f, -1.f, 98.f);
-float ambientStrength = 1.0f;
-float specularStrength = 1.0f;
+glm::vec3 LightColor(0.358f, 0.203f, 0.203f);
+glm::vec3 ObjectColor(0.627f, 0.083f, 0.083f);
+glm::vec3 lightPos(41.f, 23.f, -12.f);
+glm::vec3 ViewPos(-33.9f, 0.f, -20.f);
+float ambientStrength = 1.8f;
+float specularStrength = 35.3f;
 float FOV;
 
 namespace RenderVars {
@@ -69,7 +69,7 @@ namespace RenderVars {
 	} prevMouse;
 
 	float panv[3] = { 0.f, -20.f, -50.f };
-	float rota[2] = { 0.f, 0.f };
+	float rota[2] = { 0.f, -50.f };
 }
 namespace RV = RenderVars;
 
@@ -85,6 +85,7 @@ void GUI() {
 		ImGui::ColorEdit3("Light Color", &LightColor.x);
 		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
 		ImGui::DragFloat3("Light Pos", &lightPos.x);
+		ImGui::DragFloat3("View Pos", &ViewPos.x);
 		ImGui::DragFloat("FOV", &FOV);
 
 		if (ImGui::DragFloat3("Camera Movement", { CameraPosition }, 0.05f)) {
@@ -151,6 +152,9 @@ void GLmousecb(MouseEvent ev) {
 		case MouseEvent::Button::Left: // ROTATE
 			RV::rota[0] += diffx * 0.005f;
 			RV::rota[1] += diffy * 0.005f;
+			ViewPos.x += diffx;
+			ViewPos.y += diffy;
+			ViewPos.z += diffy;
 			break;
 		case MouseEvent::Button::Right: // MOVE XY
 			RV::panv[0] += diffx * 0.03f;
@@ -181,7 +185,7 @@ void GLinit(int width, int height) {
 
 	// Setup shaders & geometry
 
-	bool res = loadOBJ("kirby.obj", vertices, uvs, normals);
+	bool res = loadOBJ("lizard.obj", vertices, uvs, normals);
 
 	MyLoadedModel::setupModel();
 	Box::setupBox();
@@ -208,7 +212,7 @@ void GLrender(float dt) {
 
 
 	MyLoadedModel::drawModel();
-	Box::drawBox();
+	Cube::drawCube();
 	Cube::draw2Cubes();
 	Cube::draw2CubesMore();
 
@@ -479,12 +483,15 @@ namespace Cube
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(00.0f, -2.4f, 0.0f));
+		glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
+		objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.1f, 1.f, 1.f, 0.f);
 		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
-
+		
 		glUseProgram(0);
 		glBindVertexArray(0);
 		glDisable(GL_PRIMITIVE_RESTART);
@@ -742,7 +749,7 @@ namespace MyLoadedModel {
 		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), RenderVars::rota[0], RenderVars::rota[1], RenderVars::FOV);
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glDrawArrays(GL_TRIANGLES, 0, 10000);
