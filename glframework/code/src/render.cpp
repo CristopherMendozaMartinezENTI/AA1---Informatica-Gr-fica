@@ -12,9 +12,9 @@
 #include <glm/gtx/transform.hpp>
 //variables to load an object:
 #define M_PI 3.1415926535897932385f 
-#define M_WIDTH 1920 
-#define M_HEIGHT 1200 
-#define Z_MAX -15
+#define M_WIDTH 800 
+#define M_HEIGHT 600 
+#define Z_MAX -17
 #define Z_MIN -7 
 
 void GLResize(int width, int height);
@@ -29,7 +29,7 @@ std::vector< glm::vec3 > normals;
 
 float lightValuesPos[3] = {0.f,0.f,0.f};
 float colorValues[4] = { 1.f, 1.f, 0.f, 0.f };
-float CameraPosition[3] = { 0.f, -2.f, -26.f };
+float CameraPosition[3] = { 0.f, -2.f, Z_MAX };
 float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
 
 extern bool loadOBJ(const char * path,
@@ -43,8 +43,8 @@ struct MyCamera {
 	float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
 	float t; //time
 	float d; // initial distance
-	int width{1920};
-	int height{1200};
+	int width{800};
+	int height{600};
 
 	glm::vec3 mCenter;
 	glm::vec3 mEye;
@@ -88,7 +88,7 @@ float dollyZoomFovy() {
 	float fovyInit = 50.0f; // initial field of view
 	float theta = fovyInit / 180.0f * M_PI; // degree to rad
 	float f = 1.0f / tan(theta / 2.0f);
-	float fNew = f * (cameraOptions->d * cameraOptions->t - 1) / (cameraOptions->d - 1);
+	float fNew = f * ((cameraOptions->d * cameraOptions->t - 1) / (cameraOptions->d - 1));
 	float thetaNew = atan(1.0f / fNew) * 2.0f;
 	float val = 180.0f * thetaNew / M_PI; //rad to degree
 	return val;
@@ -123,7 +123,7 @@ namespace RenderVars {
 		bool waspressed = false;
 	} prevMouse;
 
-	float panv[3] = { 0.f, -20.f, -17 };
+	float panv[3] = { 0.f, -20.f, -17.f };
 	float rota[2] = { 0.f, -50.f };
 }
 namespace RV = RenderVars;
@@ -262,12 +262,12 @@ void GLcleanup() {
 void GLrender(float dt) {
 	cameraOptions->t = dt;
 	cameraOptions->d = cameraOptions->width / (2 * glm::tan(FOV / 2));
-	std::cout << (cameraOptions->d) << std::endl;
-	cameraOptions->CameraPosition[2] = cameraOptions->t*-cameraOptions->d;
 
 
 
 	if (cameraOptions->DollyZoom) {
+		cameraOptions->CameraPosition[2] = -cameraOptions->t*cameraOptions->d;
+
 		if (cameraOptions->DollyLoop) {
 			FOV -= 0.05f;
 			if (FOV < 0.5f)
@@ -284,7 +284,7 @@ void GLrender(float dt) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	RV::_modelView = glm::mat4(1.f);
-	cameraOptions->Update();
+//	cameraOptions->Update();
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	RV::_projection = glm::perspective(dollyZoomFovy(), (float)cameraOptions->width / (float)cameraOptions->height, RV::zNear, RV::zFar);
