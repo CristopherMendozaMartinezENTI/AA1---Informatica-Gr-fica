@@ -6,11 +6,20 @@
 #include <glm/gtc/matrix_transform.hpp> // lookAt
 #include "GL_framework.h"
 #include <vector>
-
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <iostream>
+#include <glm/gtx/transform.hpp>
 //variables to load an object:
+#define M_PI 3.1415926535897932385f 
+#define M_WIDTH 800 
+#define M_HEIGHT 600 
+#define Z_MAX -14
+#define Z_MIN -7 
+
+float tmpFOV = glm::radians(50.f);
+float FOV = glm::radians(50.f);
+float FOVII = glm::radians(50.f);
 
 std::vector< glm::vec3 > vertices;
 std::vector< glm::vec2 > uvs;
@@ -18,9 +27,63 @@ std::vector< glm::vec3 > normals;
 
 float lightValuesPos[3] = {0.f,0.f,0.f};
 float colorValues[4] = { 1.f, 1.f, 0.f, 0.f };
-float CameraPosition[3] = { 0.f, -2.f, -24.f };
+float CameraPosition[3] = { 0.f, -2.f, -26.f };
 float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
 
+struct MyCamera {
+	float CameraPosition[3] = { 0.f, -5.f, -17.f };
+	float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
+	float t; //time
+	const float d0; // initial distance
+	int width{1920};
+	int height{1200};
+
+	glm::vec3 mCenter;
+	glm::vec3 mEye;
+	glm::mat4x4 mMatrix = {  };
+	glm::vec3 mUp;
+
+	std::vector<float> randVals;
+
+	bool DollyZoom{ false };
+
+	void Update() {
+		glm::translate(mMatrix, mUp);
+		GLResize(width, height);
+	}
+
+	MyCamera() : t(1.0), d0(3.0), width(0), height(0) {}
+
+
+	void init() {
+		glEnable(GL_DEPTH_TEST);
+		// create random values between -1.0 and 1.0
+		for (unsigned r = 0; r < 1000; r++) {
+			int rval = rand();
+			randVals.push_back(2.0f*float(rval) / float(RAND_MAX) - 1.0f);
+		}
+	}
+
+	void resize(int w, int h) {
+		// ignore this for now
+		glViewport(0, 0, w, h);
+		width = w;
+		height = h;
+	}
+
+};
+MyCamera *cameraOptions;
+
+
+float dollyZoomFovy() {
+	float fovyInit = 60.0f; // initial field of view
+	float theta = fovyInit / 180.0f * M_PI; // degree to rad
+	float f = 1.0f / tan(theta / 2.0f);
+	float fNew = f * (cameraOptions->d0*cameraOptions->t - 1) / (cameraOptions->d0 - 1);
+	float thetaNew = atan(1.0f / fNew) * 2.0f;
+	float val = 180.0f * thetaNew / M_PI; //rad to degree
+	return val;
+}
 
 extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_vertices,
@@ -28,27 +91,15 @@ extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_normals
 );
 
-struct Camera
-{
-	glm::vec3 mCenter;
-	glm::vec3 mEye;
-	glm::mat4x4 mMatrix = {  };
-	glm::vec3 mUp;
 
-	void Update() {
-		glm::translate(mMatrix, mUp);
-	}
-};
-
-Camera cm;
 bool show_test_window = false;
 
-glm::vec3 LightColor(0.358f, 0.203f, 0.203f);
-glm::vec3 ObjectColor(0.627f, 0.083f, 0.083f);
-glm::vec3 lightPos(41.f, 23.f, -12.f);
-glm::vec3 ViewPos(-33.9f, 0.f, -20.f);
-float ambientStrength = 1.8f;
-float specularStrength = 35.3f;
+glm::vec3 LightColor(1.f, 1.f, 1.f);
+glm::vec3 ObjectColor(0.5f, 0.1f, 0.1f);
+glm::vec3 lightPos(41.f, 23.f, 27.f);
+glm::vec3 ViewPos(-36.9f, -1.f, 98.f);
+float ambientStrength = 1.0f;
+float specularStrength = 1.0f;
 float FOV;
 
 namespace RenderVars {
@@ -85,15 +136,21 @@ void GUI() {
 		ImGui::ColorEdit3("Light Color", &LightColor.x);
 		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
 		ImGui::DragFloat3("Light Pos", &lightPos.x);
-		ImGui::DragFloat3("View Pos", &ViewPos.x);
 		ImGui::DragFloat("FOV", &FOV);
 
-		if (ImGui::DragFloat3("Camera Movement", { CameraPosition }, 0.05f)) {
+		if (ImGui::DragFloat3("Camera Movement", { cameraOptions->CameraPosition }, 0.05f)) {
 
 		}
 
 		if (ImGui::Button("Dolly Click")) {
-			cm.Update();
+			if (!cameraOptions->DollyZoom) {
+				tmpFOV = FOVII;
+				FOVII = dollyZoomFovy();
+			}
+			else
+				FOVII = tmpFOV;
+
+			cameraOptions->DollyZoom = !cameraOptions->DollyZoom;
 		}
 	
 	// .........................
@@ -140,8 +197,9 @@ namespace MyLoadedModel {
 ////////////////
 void GLResize(int width, int height) {
 	glViewport(0, 0, width, height);
-	if(height != 0) RV::_projection = glm::perspective(RV::FOV, (float)width / (float)height, RV::zNear, RV::zFar);
-	else RV::_projection = glm::perspective(RV::FOV, 0.f, RV::zNear, RV::zFar);
+	if(height != 0) RV::_projection = glm::perspective(FOV, (float)width / (float)height, RV::zNear, RV::zFar);
+	else RV::_projection = glm::perspective(FOV, 0.f, RV::zNear, RV::zFar);
+	cameraOptions->resize(width, height);
 }
 
 void GLmousecb(MouseEvent ev) {
@@ -174,6 +232,10 @@ void GLmousecb(MouseEvent ev) {
 }
 
 void GLinit(int width, int height) {
+	cameraOptions = new MyCamera();
+	cameraOptions->init();
+	cameraOptions->width = width;
+	cameraOptions->height = height;
 	glViewport(0, 0, width, height);
 	glClearColor(0.2f, 0.2f, 0.2f, 1.f);
 	glClearDepth(1.f);
@@ -181,7 +243,7 @@ void GLinit(int width, int height) {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 
-	RV::_projection = glm::perspective(RV::FOV, (float)width/(float)height, RV::zNear, RV::zFar);
+	RV::_projection = glm::perspective(FOV, (float)width/(float)height, RV::zNear, RV::zFar);
 
 	// Setup shaders & geometry
 
@@ -198,13 +260,52 @@ void GLcleanup() {
 	Axis::cleanupAxis();
 	MyLoadedModel::cleanupModel();
 }
-
 //void GLrender(double currentTime) {
 void GLrender(float dt) {
+	cameraOptions->t = dt;
+	if (cameraOptions->DollyZoom) {
+		float distance = glm::distance(glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]), glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], Z_MIN));
+		if ((FOV - tmpFOV) <= 0.8f ) {
+			FOV -= FOVII * 0.0001f;
+		}
+		if (distance > 0.f ) {
+			if (cameraOptions->CameraPosition[2] > Z_MIN) {
+			//	cameraOptions->CameraPosition[2] = Z_MIN;
+			}
+			else {
+				cameraOptions->CameraPosition[2] += 0.129f;
+				std::cout << distance << " 1 " << std::endl;
+
+			}
+		}
+	}
+	else {
+		float distance = glm::distance(glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]), glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], Z_MAX));
+		if ((FOV - tmpFOV) >= 0.1f) {
+			FOV -= FOVII * dt;
+		}
+		if (distance > 0.f) {
+			if (cameraOptions->CameraPosition[2] < Z_MAX) {
+				//	cameraOptions->CameraPosition[2] = Z_MAX;
+			}
+			else {
+				cameraOptions->CameraPosition[2] -= 0.4f;
+				std::cout << distance << " 2 " << std::endl;
+
+			}
+		}
+
+	}
+
+	RV::_projection = glm::perspective(FOV, (float)cameraOptions->width / (float)cameraOptions->height, RV::zNear, RV::zFar);
+
+	RV::_projection *= glm::lookAt(glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]),glm::vec3(0.f,0.f,0.f), glm::vec3(0.f, 1.f, 0.f));
+
+	cameraOptions->Update();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	RV::_modelView = glm::mat4(1.f);
-	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(CameraPosition[0], CameraPosition[1], CameraPosition[2]));
+	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
 
@@ -766,3 +867,14 @@ namespace MyLoadedModel {
 
 
 
+
+
+
+void GLResize(int width, int height);
+glm::vec3 LightColor(1.f, 1.f, 1.f);
+glm::vec3 ObjectColor(0.5f, 0.1f, 0.1f);
+glm::vec3 lightPos(41.f, 23.f, 27.f);
+glm::vec3 ViewPos(-36.9f, -1.f, 98.f);
+float ambientStrength = 1.0f;
+float specularStrength = 1.0f;
+		ImGui::DragFloat("FOV", &FOV, 0.001f);
