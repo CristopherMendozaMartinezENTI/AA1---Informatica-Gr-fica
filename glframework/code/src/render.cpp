@@ -11,7 +11,6 @@
 #include <iostream>
 #include <glm/gtx/transform.hpp>
 
-
 std::vector< glm::vec3 > vertices;
 std::vector< glm::vec2 > uvs;
 std::vector< glm::vec3 > normals;
@@ -22,8 +21,9 @@ extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_normals
 );
 
-struct MyCamera {
-	float CameraPosition[3] = { 0.f, -5.f, -24.f };
+//Para realizar el Dolly Zoom trabajeros con nuestro propio struct Camera 
+struct Camera {
+	float CameraPosition[3] = { 0.f, -5.f, -24.f }; //Inicializamos la posicion inicial de la camara 
 	float t; //Contador de tiempo
 	float d; // Distancia inicial entre la camara y el objeto
 	int width{ 1920 };
@@ -32,7 +32,7 @@ struct MyCamera {
 	bool DollyZoom{ false };
 	bool DollyLoop{ false };
 
-	MyCamera() : t(0.33), d(255.0), width(0), height(0) {}
+	Camera() : t(0.33), d(255.0), width(0), height(0) {}
 
 	//Llamamos a esta funcion cada vez que hacemos un resize de la ventana de esta manera actulizamos tambien el viewport de la camara.
 	void resize(int w, int h) {
@@ -40,9 +40,9 @@ struct MyCamera {
 		width = w;
 		height = h;
 	}
-
 };
-MyCamera *cameraOptions;
+
+Camera *cameraOptions;
 
 bool show_test_window = false;
 
@@ -56,33 +56,10 @@ float specularStrength = 35.3f;
 float shininess = 32.f;
 float FOV = glm::radians(50.f);
 
-namespace RenderVars {
-	float FOV = glm::radians(50.f);
-	const float zNear = 1.f;
-	const float zFar = 500.f;
-
-	glm::mat4 _projection;
-	glm::mat4 _modelView;
-	glm::mat4 _MVP;
-	glm::mat4 _inv_modelview;
-	glm::vec4 _cameraPoint;
-
-	struct prevMouse {
-		float lastx, lasty;
-		MouseEvent::Button button = MouseEvent::Button::None;
-		bool waspressed = false;
-	} prevMouse;
-
-	float panv[3] = { 0.f, -20.f, -17.f };
-	float rota[2] = { 0.f, -50.f };
-}
-namespace RV = RenderVars;
-
 void GUI() {
 	bool show = true;
 	ImGui::Begin("Simulation Parameters", &show, 0);
 
-	// Do your GUI code here....
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
 	ImGui::DragFloat("Ambient Strength", &ambientStrength, 0.1f);
@@ -106,15 +83,36 @@ void GUI() {
 		FOV = glm::radians(50.f);
 	}
 
-	// .........................
 	ImGui::End();
 
-	// Example code -- ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
+	
 	if (show_test_window) {
 		ImGui::SetNextWindowPos(ImVec2(650, 60), ImGuiSetCond_FirstUseEver);
 		ImGui::ShowTestWindow(&show_test_window);
 	}
 }
+
+namespace RenderVars {
+	float FOV = glm::radians(50.f);
+	const float zNear = 1.f;
+	const float zFar = 500.f;
+
+	glm::mat4 _projection;
+	glm::mat4 _modelView;
+	glm::mat4 _MVP;
+	glm::mat4 _inv_modelview;
+	glm::vec4 _cameraPoint;
+
+	struct prevMouse {
+		float lastx, lasty;
+		MouseEvent::Button button = MouseEvent::Button::None;
+		bool waspressed = false;
+	} prevMouse;
+
+	float panv[3] = { 0.f, -20.f, -17.f };
+	float rota[2] = { 0.f, -50.f };
+}
+namespace RV = RenderVars;
 
 ///////// fw decl
 namespace ImGui {
@@ -188,7 +186,7 @@ void GLmousecb(MouseEvent ev) {
 void GLinit(int width, int height) {
 	//Inicializamos una nueva Camara
 	//Igualmaos los valores del with y el height de la ventano con los de las variables width y height de la camara y hacemos un resize
-	cameraOptions = new MyCamera();
+	cameraOptions = new Camera();
 	cameraOptions->width = width;
 	cameraOptions->height = height;
 	//cameraOptions->resize(width, height);
@@ -225,8 +223,8 @@ void GLrender(float dt) {
 	cameraOptions->d = cameraOptions->width / (2 * glm::tan(FOV / 2));
 
 	if (cameraOptions->DollyZoom) {
-		//Multiplicamos el tiempo que ha pasado por la distancia entre el objeto y la camara. 
-		//Seguidamente lo igualamos a la posicion de la camara en Z para realizar el zoom de forma dinamica 
+		//Multiplicamos el tiempo que ha pasado por la distancia entre el objeto y la camara 
+		//Seguidamente lo igualamos a la posicion de la camara en Z para realizar el zoom de forma dinamica
 		//Al final dividimos todo esto entro 2 para que la camara se mantenga cerca del modelo en la relacion al tama�o de la ventana 
 		cameraOptions->CameraPosition[2] = (-cameraOptions->t*cameraOptions->d) / 2;
 
