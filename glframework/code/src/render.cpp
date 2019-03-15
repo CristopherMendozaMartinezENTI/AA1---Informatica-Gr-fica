@@ -22,7 +22,6 @@ extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_normals
 );
 
-
 struct MyCamera {
 	float CameraPosition[3] = { 0.f, -5.f, -24.f };
 	float t; //Contador de tiempo
@@ -54,6 +53,7 @@ glm::vec3 lightPos(41.f, 23.f, -12.f);
 glm::vec3 ViewPos(-33.9f, 0.f, -20.f);
 float ambientStrength = 1.8f;
 float specularStrength = 35.3f;
+float shininess = 32.f;
 float FOV = glm::radians(50.f);
 
 namespace RenderVars {
@@ -87,6 +87,7 @@ void GUI() {
 
 	ImGui::DragFloat("Ambient Strength", &ambientStrength, 0.1f);
 	ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
+	ImGui::DragFloat("Shininess", &shininess, 0.1f);
 	ImGui::ColorEdit3("Light Color", &LightColor.x);
 	ImGui::ColorEdit3("Model Color", &ObjectColor.x);
 	ImGui::DragFloat3("Light Pos", &lightPos.x);
@@ -690,7 +691,6 @@ namespace Axis {
 }
 
 ////////////////////////////////////////////////// MyModel
-
 namespace MyLoadedModel {
 	GLuint modelVao;
 	GLuint modelVbo[3];
@@ -730,6 +730,7 @@ namespace MyLoadedModel {
 	uniform vec3 viewPos; \n\
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
+	uniform float shininess; \n\
 	void main() {\n\
 		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
 		vec3 ambient = ambientStrength * LightColor;\n\
@@ -741,7 +742,7 @@ namespace MyLoadedModel {
 		//Realizamos los calculos necesarios para conseguir luz especular \n\
 		vec3 viewDir = normalize(viewPos - FragPos); \n\
  		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32); \n\
+		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
 		vec3 specular = specularStrength * spec * LightColor; \n\
 		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
 		vec3 result = (ambient + diffuse + specular) * ObjectColor; \n\
@@ -805,6 +806,7 @@ namespace MyLoadedModel {
 		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
 		glDrawArrays(GL_TRIANGLES, 0, 10000);
 
 
