@@ -6,21 +6,14 @@
 #include <glm/gtc/matrix_transform.hpp> // lookAt
 #include "GL_framework.h"
 #include <vector>
-
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
 #include <iostream>
-//variables to load an object:
+#include <glm/gtx/transform.hpp>
 
 std::vector< glm::vec3 > vertices;
 std::vector< glm::vec2 > uvs;
 std::vector< glm::vec3 > normals;
-
-float lightValuesPos[3] = {0.f,0.f,0.f};
-float colorValues[4] = { 1.f, 1.f, 0.f, 0.f };
-float CameraPosition[3] = { 0.f, -2.f, -24.f };
-float old_CameraPosition[3] = { 0.f, -20.f, -50.f };
-
 
 extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_vertices,
@@ -28,28 +21,42 @@ extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_normals
 );
 
-struct Camera
-{
-	glm::vec3 mCenter;
-	glm::vec3 mEye;
-	glm::mat4x4 mMatrix = {  };
-	glm::vec3 mUp;
 
-	void Update() {
-		glm::translate(mMatrix, mUp);
+
+
+struct MyCamera {
+	float CameraPosition[3] = { 0.f, -5.f, -24.f };
+	float t; //Contador de tiempo
+	float d; // Distancia inicial entre la camara y el objeto
+	int width{ 1920 };
+	int height{ 1080 };
+
+	bool DollyZoom{ false };
+	bool DollyLoop{ false };
+
+	MyCamera() : t(0.33), d(255.0), width(0), height(0) {}
+
+	//Llamamos a esta funcion cada vez que hacemos un resize de la ventana de esta manera actulizamos tambien el viewport de la camara.
+	void resize(int w, int h) {
+		glViewport(0, 0, w, h);
+		width = w;
+		height = h;
 	}
+
 };
 
-Camera cm;
+MyCamera *cameraOptions;
+
 bool show_test_window = false;
 
+//Variables que utilizaremos en la interfaz de usuario
 glm::vec3 LightColor(0.358f, 0.203f, 0.203f);
 glm::vec3 ObjectColor(0.627f, 0.083f, 0.083f);
 glm::vec3 lightPos(41.f, 23.f, -12.f);
 glm::vec3 ViewPos(-33.9f, 0.f, -20.f);
 float ambientStrength = 1.8f;
 float specularStrength = 35.3f;
-float FOV;
+float FOV = glm::radians(50.f);
 
 namespace RenderVars {
 	float FOV = glm::radians(50.f);
@@ -68,7 +75,7 @@ namespace RenderVars {
 		bool waspressed = false;
 	} prevMouse;
 
-	float panv[3] = { 0.f, -20.f, -50.f };
+	float panv[3] = { 0.f, -20.f, -17.f };
 	float rota[2] = { 0.f, -50.f };
 }
 namespace RV = RenderVars;
@@ -78,24 +85,28 @@ void GUI() {
 	ImGui::Begin("Simulation Parameters", &show, 0);
 
 	// Do your GUI code here....
-		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
-		ImGui::DragFloat("Ambient Strength", &ambientStrength, 0.1f);
-		ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
-		ImGui::ColorEdit3("Light Color", &LightColor.x);
-		ImGui::ColorEdit3("Model Color", &ObjectColor.x);
-		ImGui::DragFloat3("Light Pos", &lightPos.x);
-		ImGui::DragFloat3("View Pos", &ViewPos.x);
-		ImGui::DragFloat("FOV", &FOV);
+	ImGui::DragFloat("Ambient Strength", &ambientStrength, 0.1f);
+	ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
+	ImGui::ColorEdit3("Light Color", &LightColor.x);
+	ImGui::ColorEdit3("Model Color", &ObjectColor.x);
+	ImGui::DragFloat3("Light Pos", &lightPos.x);
+	ImGui::DragFloat3("View Pos", &ViewPos.x);
+	ImGui::DragFloat3("Camera Position", { cameraOptions->CameraPosition }, 0.05f);
 
-		if (ImGui::DragFloat3("Camera Movement", { CameraPosition }, 0.05f)) {
+	if (ImGui::Button("Start Dolly Zoom")) {
+		cameraOptions->DollyZoom = !cameraOptions->DollyZoom;
+	}
 
-		}
+	if (ImGui::Button("Reset Simulation"))
+	{
+		cameraOptions->CameraPosition[0] =  0.f;
+		cameraOptions->CameraPosition[1] = -5.f;
+		cameraOptions->CameraPosition[2] = -24.f;
+		FOV = glm::radians(50.f);
+	}
 
-		if (ImGui::Button("Dolly Click")) {
-			cm.Update();
-		}
-	
 	// .........................
 	ImGui::End();
 
@@ -111,9 +122,9 @@ namespace ImGui {
 	void Render();
 }
 namespace Box {
-void setupBox();
-void cleanupBox();
-void drawBox();
+	void setupBox();
+	void cleanupBox();
+	void drawBox();
 }
 
 namespace Cube {
@@ -125,9 +136,9 @@ namespace Cube {
 }
 
 namespace Axis {
-void setupAxis();
-void cleanupAxis();
-void drawAxis();
+	void setupAxis();
+	void cleanupAxis();
+	void drawAxis();
 }
 
 namespace MyLoadedModel {
@@ -140,15 +151,16 @@ namespace MyLoadedModel {
 ////////////////
 void GLResize(int width, int height) {
 	glViewport(0, 0, width, height);
-	if(height != 0) RV::_projection = glm::perspective(RV::FOV, (float)width / (float)height, RV::zNear, RV::zFar);
-	else RV::_projection = glm::perspective(RV::FOV, 0.f, RV::zNear, RV::zFar);
+	cameraOptions->resize(width, height);
+	if (height != 0) RV::_projection = glm::perspective(FOV, (float)width / (float)height, RV::zNear, RV::zFar);
+	else RV::_projection = glm::perspective(FOV, 0.f, RV::zNear, RV::zFar);
 }
 
 void GLmousecb(MouseEvent ev) {
-	if(RV::prevMouse.waspressed && RV::prevMouse.button == ev.button) {
+	if (RV::prevMouse.waspressed && RV::prevMouse.button == ev.button) {
 		float diffx = ev.posx - RV::prevMouse.lastx;
 		float diffy = ev.posy - RV::prevMouse.lasty;
-		switch(ev.button) {
+		switch (ev.button) {
 		case MouseEvent::Button::Left: // ROTATE
 			RV::rota[0] += diffx * 0.005f;
 			RV::rota[1] += diffy * 0.005f;
@@ -165,7 +177,8 @@ void GLmousecb(MouseEvent ev) {
 			break;
 		default: break;
 		}
-	} else {
+	}
+	else {
 		RV::prevMouse.button = ev.button;
 		RV::prevMouse.waspressed = true;
 	}
@@ -174,6 +187,13 @@ void GLmousecb(MouseEvent ev) {
 }
 
 void GLinit(int width, int height) {
+	//Inicializamos una nueva Camara
+	//Igualmaos los valores del with y el height de la ventano con los de las variables width y height de la camara y hacemos un resize
+	cameraOptions = new MyCamera();
+	cameraOptions->width = width;
+	cameraOptions->height = height;
+	//cameraOptions->resize(width, height);
+
 	glViewport(0, 0, width, height);
 	glClearColor(0.2f, 0.2f, 0.2f, 1.f);
 	glClearDepth(1.f);
@@ -181,16 +201,15 @@ void GLinit(int width, int height) {
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 
-	RV::_projection = glm::perspective(RV::FOV, (float)width/(float)height, RV::zNear, RV::zFar);
+	RV::_projection = glm::perspective(FOV, (float)width / (float)height, RV::zNear, RV::zFar);
 
-	// Setup shaders & geometry
-
+	//Hacemos un setup de todos los elementos dentro de la escena 
 	bool res = loadOBJ("lizard.obj", vertices, uvs, normals);
 
 	MyLoadedModel::setupModel();
 	Box::setupBox();
 	Cube::setupCube();
-	
+
 }
 
 void GLcleanup() {
@@ -199,29 +218,63 @@ void GLcleanup() {
 	MyLoadedModel::cleanupModel();
 }
 
-//void GLrender(double currentTime) {
 void GLrender(float dt) {
+	//Igualamos el tiempo (que se cuenta durante la ejecucion del programa) al contador de tiempo de la camara
+	cameraOptions->t = dt;
+
+	//Ponemos en practica la formula matematica del Dolly Zoom para conseguir la distancia entre el objeto y la camara
+	cameraOptions->d = cameraOptions->width / (2 * glm::tan(FOV / 2));
+
+	if (cameraOptions->DollyZoom) {
+		//Multiplicamos el tiempo que ha pasado por la distancia entre el objeto y la camara. 
+		//Seguidamente lo igualamos a la posicion de la camara en Z para realizar el zoom de forma dinamica 
+		//Al final dividimos todo esto entro 2 para que la camara se mantenga cerca del modelo en la relacion al tamaño de la ventana 
+		cameraOptions->CameraPosition[2] = (-cameraOptions->t*cameraOptions->d) / 2;
+
+		//"Abrimos" el FOV o lo "cerramos" mientras realizamos el zoom 
+		if (cameraOptions->DollyLoop) {
+			FOV -= 0.03f;
+			if (FOV < 0.5f)
+				cameraOptions->DollyLoop = false;
+		}
+		else
+		{
+			FOV += 0.03f;
+			if (FOV > 2.5f)
+				cameraOptions->DollyLoop = true;
+		}
+	}
+
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	RV::_modelView = glm::mat4(1.f);
-	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(CameraPosition[0], CameraPosition[1], CameraPosition[2]));
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	//Realiazmos las transformaciones necesarias para colocar la camara delante de nuestro modelo
+	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
 	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
+	//Realizamos la proyeccion respecto al FOV. Este varia durante el dolly zoom, de esta manera creamos ese efecto optico.
+	RV::_projection = glm::perspective(FOV, (float)cameraOptions->width / (float)cameraOptions->height, RV::zNear, RV::zFar);
 
+	//Renderizamos los modelos 
 	MyLoadedModel::drawModel();
 	Cube::drawCube();
 	Cube::draw2Cubes();
 	Cube::draw2CubesMore();
-
 	ImGui::Render();
 }
 
 
 //////////////////////////////////// COMPILE AND LINK
-GLuint compileShader(const char* shaderStr, GLenum shaderType, const char* name="") {
+GLuint compileShader(const char* shaderStr, GLenum shaderType, const char* name = "") {
 	GLuint shader = glCreateShader(shaderType);
 	glShaderSource(shader, 1, &shaderStr, NULL);
 	glCompileShader(shader);
@@ -253,7 +306,7 @@ void linkProgram(GLuint program) {
 
 
 ////////////////////////////////////////////////// BOX
-namespace Box{
+namespace Box {
 	GLuint BoxVao;
 	GLuint BoxVbo[2];
 	GLuint BoxShaders[2];
@@ -279,14 +332,14 @@ namespace Box{
 	};
 
 	const char* vertShader_xform =
-	"#version 330\n\
+		"#version 330\n\
 	in vec3 in_Position;\n\
 	uniform mat4 mvpMat;\n\
 	void main() {\n\
 		gl_Position = mvpMat * vec4(in_Position, 1.0);\n\
 	}";
 	const char* fragShader_flatColor =
-	"#version 330\n\
+		"#version 330\n\
 	out vec4 out_Color;\n\
 	uniform vec4 color;\n\
 	uniform mat4 vert_Normal; \n\
@@ -347,7 +400,7 @@ namespace Box{
 	}
 }
 
-namespace Cube 
+namespace Cube
 {
 	GLuint cubeVao;
 	GLuint cubeVbo[3];
@@ -411,7 +464,7 @@ namespace Cube
 	};
 
 	const char* cube_vertShader =
-	"#version 330\n\
+		"#version 330\n\
 	in vec3 in_Position;\n\
 	in vec3 in_Normal;\n\
 	out vec4 vert_Normal;\n\
@@ -423,7 +476,7 @@ namespace Cube
 		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
 	}";
 	const char* cube_fragShader =
-	"#version 330\n\
+		"#version 330\n\
 	in vec4 vert_Normal;\n\
 	out vec4 out_Color;\n\
 	uniform mat4 mv_Mat;\n\
@@ -491,7 +544,7 @@ namespace Cube
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.1f, 1.f, 1.f, 0.f);
 		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
-		
+
 		glUseProgram(0);
 		glBindVertexArray(0);
 		glDisable(GL_PRIMITIVE_RESTART);
@@ -543,99 +596,99 @@ namespace Cube
 
 ////////////////////////////////////////////////// AXIS
 namespace Axis {
-GLuint AxisVao;
-GLuint AxisVbo[3];
-GLuint AxisShader[2];
-GLuint AxisProgram;
+	GLuint AxisVao;
+	GLuint AxisVbo[3];
+	GLuint AxisShader[2];
+	GLuint AxisProgram;
 
-float AxisVerts[] = {
-	0.0, 0.0, 0.0,
-	1.0, 0.0, 0.0,
-	0.0, 0.0, 0.0,
-	0.0, 1.0, 0.0,
-	0.0, 0.0, 0.0,
-	0.0, 0.0, 1.0
-};
-float AxisColors[] = {
-	1.0, 0.0, 0.0, 1.0,
-	1.0, 0.0, 0.0, 1.0,
-	0.0, 1.0, 0.0, 1.0,
-	0.0, 1.0, 0.0, 1.0,
-	0.0, 0.0, 1.0, 1.0,
-	0.0, 0.0, 1.0, 1.0
-};
-GLubyte AxisIdx[] = {
-	0, 1,
-	2, 3,
-	4, 5
-};
-const char* Axis_vertShader =
-"#version 330\n\
-in vec3 in_Position;\n\
-in vec4 in_Color;\n\
-out vec4 vert_color;\n\
-uniform mat4 mvpMat;\n\
-void main() {\n\
-	vert_color = in_Color;\n\
-	gl_Position = mvpMat * vec4(in_Position, 1.0);\n\
-}";
-const char* Axis_fragShader =
-"#version 330\n\
-in vec4 vert_color;\n\
-out vec4 out_Color;\n\
-void main() {\n\
-	out_Color = vert_color;\n\
-}";
+	float AxisVerts[] = {
+		0.0, 0.0, 0.0,
+		1.0, 0.0, 0.0,
+		0.0, 0.0, 0.0,
+		0.0, 1.0, 0.0,
+		0.0, 0.0, 0.0,
+		0.0, 0.0, 1.0
+	};
+	float AxisColors[] = {
+		1.0, 0.0, 0.0, 1.0,
+		1.0, 0.0, 0.0, 1.0,
+		0.0, 1.0, 0.0, 1.0,
+		0.0, 1.0, 0.0, 1.0,
+		0.0, 0.0, 1.0, 1.0,
+		0.0, 0.0, 1.0, 1.0
+	};
+	GLubyte AxisIdx[] = {
+		0, 1,
+		2, 3,
+		4, 5
+	};
+	const char* Axis_vertShader =
+		"#version 330\n\
+		in vec3 in_Position;\n\
+		in vec4 in_Color;\n\
+		out vec4 vert_color;\n\
+		uniform mat4 mvpMat;\n\
+		void main() {\n\
+			vert_color = in_Color;\n\
+			gl_Position = mvpMat * vec4(in_Position, 1.0);\n\
+		}";
+	const char* Axis_fragShader =
+		"#version 330\n\
+		in vec4 vert_color;\n\
+		out vec4 out_Color;\n\
+		void main() {\n\
+			out_Color = vert_color;\n\
+		}";
 
-void setupAxis() {
-	glGenVertexArrays(1, &AxisVao);
-	glBindVertexArray(AxisVao);
-	glGenBuffers(3, AxisVbo);
+	void setupAxis() {
+		glGenVertexArrays(1, &AxisVao);
+		glBindVertexArray(AxisVao);
+		glGenBuffers(3, AxisVbo);
 
-	glBindBuffer(GL_ARRAY_BUFFER, AxisVbo[0]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 24, AxisVerts, GL_STATIC_DRAW);
-	glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, AxisVbo[0]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 24, AxisVerts, GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
 
-	glBindBuffer(GL_ARRAY_BUFFER, AxisVbo[1]);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 24, AxisColors, GL_STATIC_DRAW);
-	glVertexAttribPointer((GLuint)1, 4, GL_FLOAT, false, 0, 0);
-	glEnableVertexAttribArray(1);
+		glBindBuffer(GL_ARRAY_BUFFER, AxisVbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 24, AxisColors, GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 4, GL_FLOAT, false, 0, 0);
+		glEnableVertexAttribArray(1);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, AxisVbo[2]);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLubyte) * 6, AxisIdx, GL_STATIC_DRAW);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, AxisVbo[2]);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLubyte) * 6, AxisIdx, GL_STATIC_DRAW);
 
-	glBindVertexArray(0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-	AxisShader[0] = compileShader(Axis_vertShader, GL_VERTEX_SHADER, "AxisVert");
-	AxisShader[1] = compileShader(Axis_fragShader, GL_FRAGMENT_SHADER, "AxisFrag");
+		AxisShader[0] = compileShader(Axis_vertShader, GL_VERTEX_SHADER, "AxisVert");
+		AxisShader[1] = compileShader(Axis_fragShader, GL_FRAGMENT_SHADER, "AxisFrag");
 
-	AxisProgram = glCreateProgram();
-	glAttachShader(AxisProgram, AxisShader[0]);
-	glAttachShader(AxisProgram, AxisShader[1]);
-	glBindAttribLocation(AxisProgram, 0, "in_Position");
-	glBindAttribLocation(AxisProgram, 1, "in_Color");
-	linkProgram(AxisProgram);
-}
-void cleanupAxis() {
-	glDeleteBuffers(3, AxisVbo);
-	glDeleteVertexArrays(1, &AxisVao);
+		AxisProgram = glCreateProgram();
+		glAttachShader(AxisProgram, AxisShader[0]);
+		glAttachShader(AxisProgram, AxisShader[1]);
+		glBindAttribLocation(AxisProgram, 0, "in_Position");
+		glBindAttribLocation(AxisProgram, 1, "in_Color");
+		linkProgram(AxisProgram);
+	}
+	void cleanupAxis() {
+		glDeleteBuffers(3, AxisVbo);
+		glDeleteVertexArrays(1, &AxisVao);
 
-	glDeleteProgram(AxisProgram);
-	glDeleteShader(AxisShader[0]);
-	glDeleteShader(AxisShader[1]);
-}
-void drawAxis() {
-	glBindVertexArray(AxisVao);
-	glUseProgram(AxisProgram);
-	glUniformMatrix4fv(glGetUniformLocation(AxisProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RV::_MVP));
-	glDrawElements(GL_LINES, 6, GL_UNSIGNED_BYTE, 0);
+		glDeleteProgram(AxisProgram);
+		glDeleteShader(AxisShader[0]);
+		glDeleteShader(AxisShader[1]);
+	}
+	void drawAxis() {
+		glBindVertexArray(AxisVao);
+		glUseProgram(AxisProgram);
+		glUniformMatrix4fv(glGetUniformLocation(AxisProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RV::_MVP));
+		glDrawElements(GL_LINES, 6, GL_UNSIGNED_BYTE, 0);
 
-	glUseProgram(0);
-	glBindVertexArray(0);
-}
+		glUseProgram(0);
+		glBindVertexArray(0);
+	}
 }
 
 ////////////////////////////////////////////////// MyModel
@@ -648,7 +701,7 @@ namespace MyLoadedModel {
 	glm::mat4 objMat = glm::mat4(1.f);
 
 	const char* model_vertShader =
-	"#version 330\n\
+		"#version 330\n\
 	in vec3 in_Position;\n\
 	in vec3 in_Normal;\n\
 	uniform vec3 lightPos;\n\
@@ -667,7 +720,7 @@ namespace MyLoadedModel {
 
 
 	const char* model_fragShader =
-	"#version 330\n\
+		"#version 330\n\
 	in vec4 vert_Normal;\n\
 	in vec3 FragPos; \n\
 	out vec4 out_Color;\n\
@@ -680,18 +733,19 @@ namespace MyLoadedModel {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	void main() {\n\
+		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
 		vec3 ambient = ambientStrength * LightColor;\n\
-		\n\
+		//Realizamos los calculos necesarios para conseguir ilumación difusa\n\
 		vec3 norm = normalize(Normal); \n\
 		vec3 lightDir = normalize(lightPos - FragPos); \n\
 		float diff = max(dot(norm, lightDir), 0.0); \n\
 		vec3 diffuse = diff * LightColor; \n\
-		\n\
+		//Realizamos los calculos necesarios para conseguir luz especular \n\
 		vec3 viewDir = normalize(viewPos - FragPos); \n\
  		vec3 reflectDir = reflect(-lightDir, norm);	\n\
 		float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32); \n\
 		vec3 specular = specularStrength * spec * LightColor; \n\
-		\n\
+		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
 		vec3 result = (ambient + diffuse + specular) * ObjectColor; \n\
 		out_Color = vec4(result, 1.0); \n\
 	}";
@@ -702,13 +756,13 @@ namespace MyLoadedModel {
 		glGenBuffers(3, modelVbo);
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[0]);
-		
+
 		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[1]);
-	
+
 		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
@@ -728,7 +782,7 @@ namespace MyLoadedModel {
 		linkProgram(modelProgram);
 	}
 	void cleanupModel() {
-	
+
 		glDeleteBuffers(2, modelVbo);
 		glDeleteVertexArrays(1, &modelVao);
 
@@ -740,12 +794,13 @@ namespace MyLoadedModel {
 		objMat = transform;
 	}
 	void drawModel() {
-	
+
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
 		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
@@ -753,7 +808,7 @@ namespace MyLoadedModel {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glDrawArrays(GL_TRIANGLES, 0, 10000);
-		
+
 
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -761,8 +816,6 @@ namespace MyLoadedModel {
 	}
 
 }
-
-
 
 
 
