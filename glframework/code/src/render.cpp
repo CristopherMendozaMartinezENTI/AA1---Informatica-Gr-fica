@@ -11,11 +11,6 @@
 #include <iostream>
 #include <glm/gtx/transform.hpp>
 
-void GLResize(int width, int height);
-
-float tmpFOV = glm::radians(50.f);
-float FOV = glm::radians(50.f);
-float FOVII = glm::radians(50.f);
 
 std::vector< glm::vec3 > vertices;
 std::vector< glm::vec2 > uvs;
@@ -26,8 +21,6 @@ extern bool loadOBJ(const char * path,
 	std::vector < glm::vec2 > & out_uvs,
 	std::vector < glm::vec3 > & out_normals
 );
-
-
 
 
 struct MyCamera {
@@ -50,8 +43,6 @@ struct MyCamera {
 	}
 
 };
-MyCamera *cameraOptions;
-
 MyCamera *cameraOptions;
 
 bool show_test_window = false;
