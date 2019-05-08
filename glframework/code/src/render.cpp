@@ -11,9 +11,13 @@
 #include <iostream>
 #include <glm/gtx/transform.hpp>
 
-std::vector< glm::vec3 > vertices;
-std::vector< glm::vec2 > uvs;
-std::vector< glm::vec3 > normals;
+std::vector< glm::vec3 > verticesChicken;
+std::vector< glm::vec2 > uvsChicken;
+std::vector< glm::vec3 > normalsChicken;
+
+std::vector< glm::vec3 > verticesTrump;
+std::vector< glm::vec2 > uvsTrump;
+std::vector< glm::vec3 > normalsTrump;
 
 extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_vertices,
@@ -49,7 +53,7 @@ bool show_test_window = false;
 //Variables que utilizaremos en la interfaz de usuario
 glm::vec3 LightColor(0.358f, 0.203f, 0.203f);
 glm::vec3 ObjectColor(0.627f, 0.083f, 0.083f);
-glm::vec3 lightPos(41.f, 23.f, -12.f);
+glm::vec3 lightPos(41.f, 23.f, 32.f);
 glm::vec3 ViewPos(-33.9f, 0.f, -20.f);
 float ambientStrength = 1.8f;
 float specularStrength = 35.3f;
@@ -145,6 +149,13 @@ namespace MyLoadedModel {
 	void drawModel();
 }
 
+namespace MyLoadedModel2 {
+	void setupModel();
+	void cleanupModel();
+	void updateModel(const glm::mat4& transform);
+	void drawModel();
+}
+
 ////////////////
 void GLResize(int width, int height) {
 	glViewport(0, 0, width, height);
@@ -201,9 +212,11 @@ void GLinit(int width, int height) {
 	RV::_projection = glm::perspective(FOV, (float)width / (float)height, RV::zNear, RV::zFar);
 
 	//Hacemos un setup de todos los elementos dentro de la escena 
-	bool res = loadOBJ("lizard.obj", vertices, uvs, normals);
+	bool res = loadOBJ("chicken.obj", verticesChicken, uvsChicken, normalsChicken);
+	bool res2 = loadOBJ("trump.obj", verticesTrump, uvsTrump, normalsTrump);
 
 	MyLoadedModel::setupModel();
+	MyLoadedModel2::setupModel();
 	Box::setupBox();
 	Cube::setupCube();
 
@@ -213,6 +226,7 @@ void GLcleanup() {
 	Box::cleanupBox();
 	Axis::cleanupAxis();
 	MyLoadedModel::cleanupModel();
+	MyLoadedModel2::cleanupModel();
 }
 
 void GLrender(float dt) {
@@ -263,6 +277,7 @@ void GLrender(float dt) {
 
 	//Renderizamos los modelos 
 	MyLoadedModel::drawModel();
+	MyLoadedModel2::drawModel();
 	Cube::drawCube();
 	Cube::draw2Cubes();
 	Cube::draw2CubesMore();
@@ -732,18 +747,26 @@ namespace MyLoadedModel {
 	void main() {\n\
 		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
 		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumaci�n difusa\n\
+		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
 		vec3 norm = normalize(Normal); \n\
 		vec3 lightDir = normalize(lightPos - FragPos); \n\
 		float diff = max(dot(norm, lightDir), 0.0); \n\
+		if(diff < 0.2) diff = 0;\n\
+		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
+		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
+		if(diff >= 0.5) diff = 1;\n\
 		vec3 diffuse = diff * LightColor; \n\
 		//Realizamos los calculos necesarios para conseguir luz especular \n\
 		vec3 viewDir = normalize(viewPos - FragPos); \n\
  		vec3 reflectDir = reflect(-lightDir, norm);	\n\
 		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
+		if(spec < 0.2) spec = 0;\n\
+		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
+		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
+		if(spec >= 0.5) spec = 1;\n\
 		vec3 specular = specularStrength * spec * LightColor; \n\
 		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse + specular) * ObjectColor; \n\
+		vec3 result = (ambient + diffuse) * ObjectColor; \n\
 		out_Color = vec4(result, 1.0); \n\
 	}";
 
@@ -754,13 +777,13 @@ namespace MyLoadedModel {
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[0]);
 
-		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, verticesChicken.size() * sizeof(glm::vec3), &verticesChicken[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[1]);
 
-		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, normalsChicken.size() * sizeof(glm::vec3), &normalsChicken[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
 
@@ -794,6 +817,8 @@ namespace MyLoadedModel {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(8.0f, 4.8f, 0.0f));
+		objMat = t1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -805,15 +830,186 @@ namespace MyLoadedModel {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
-		glDrawArrays(GL_TRIANGLES, 0, 10000);
-
-
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
+	}
 
+	void drawModel2() {
+
+		glBindVertexArray(modelVao);
+		glUseProgram(modelProgram);
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
+		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
+		glUseProgram(0);
+		glBindVertexArray(0);
 	}
 
 }
 
 
 
+////////////////////////////////////////////////// MyModel2
+namespace MyLoadedModel2 {
+	GLuint modelVao;
+	GLuint modelVbo[3];
+	GLuint modelShaders[2];
+	GLuint modelProgram;
+	glm::mat4 objMat = glm::mat4(1.f);
+
+	const char* model_vertShader =
+		"#version 330\n\
+	in vec3 in_Position;\n\
+	in vec3 in_Normal;\n\
+	uniform vec3 lightPos;\n\
+	out vec4 vert_Normal;\n\
+	out vec3 Normal; \n\
+	out vec3 FragPos; \n\
+	uniform mat4 objMat;\n\
+	uniform mat4 mv_Mat;\n\
+	uniform mat4 mvpMat;\n\
+	void main() {\n\
+		gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
+		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
+		FragPos = vec3(objMat * vec4(in_Position, 1.0)); \n\
+		Normal = in_Normal; \n\
+	}";
+
+
+	const char* model_fragShader =
+		"#version 330\n\
+	in vec4 vert_Normal;\n\
+	in vec3 FragPos; \n\
+	out vec4 out_Color;\n\
+	in vec3 Normal; \n\
+	uniform mat4 mv_Mat;\n\
+	uniform vec3 LightColor; \n\
+	uniform vec3 ObjectColor; \n\
+	uniform vec3 lightPos; \n\
+	uniform vec3 viewPos; \n\
+	uniform float ambientStrength;\n\
+	uniform float specularStrength; \n\
+	uniform float shininess; \n\
+	void main() {\n\
+		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
+		vec3 ambient = ambientStrength * LightColor;\n\
+		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
+		vec3 norm = normalize(Normal); \n\
+		vec3 lightDir = normalize(lightPos - FragPos); \n\
+		float diff = max(dot(norm, lightDir), 0.0); \n\
+		if(diff < 0.2) diff = 0;\n\
+		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
+		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
+		if(diff >= 0.5) diff = 1;\n\
+		vec3 diffuse = diff * LightColor; \n\
+		//Realizamos los calculos necesarios para conseguir luz especular \n\
+		vec3 viewDir = normalize(viewPos - FragPos); \n\
+ 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
+		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
+		if(spec < 0.2) spec = 0;\n\
+		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
+		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
+		if(spec >= 0.5) spec = 1;\n\
+		vec3 specular = specularStrength * spec * LightColor; \n\
+		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
+		vec3 result = (ambient + diffuse) * ObjectColor; \n\
+		out_Color = vec4(result, 1.0); \n\
+	}";
+
+	void setupModel() {
+		glGenVertexArrays(1, &modelVao);
+		glBindVertexArray(modelVao);
+		glGenBuffers(3, modelVbo);
+
+		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[0]);
+
+		glBufferData(GL_ARRAY_BUFFER, verticesTrump.size() * sizeof(glm::vec3), &verticesTrump[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(0);
+
+		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[1]);
+
+		glBufferData(GL_ARRAY_BUFFER, normalsTrump.size() * sizeof(glm::vec3), &normalsTrump[0], GL_STATIC_DRAW);
+		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(1);
+
+		glBindVertexArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+		modelShaders[0] = compileShader(model_vertShader, GL_VERTEX_SHADER, "cubeVert");
+		modelShaders[1] = compileShader(model_fragShader, GL_FRAGMENT_SHADER, "cubeFrag");
+
+		modelProgram = glCreateProgram();
+		glAttachShader(modelProgram, modelShaders[0]);
+		glAttachShader(modelProgram, modelShaders[1]);
+		glBindAttribLocation(modelProgram, 0, "in_Position");
+		glBindAttribLocation(modelProgram, 1, "in_Normal");
+		linkProgram(modelProgram);
+	}
+	void cleanupModel() {
+
+		glDeleteBuffers(2, modelVbo);
+		glDeleteVertexArrays(1, &modelVao);
+
+		glDeleteProgram(modelProgram);
+		glDeleteShader(modelShaders[0]);
+		glDeleteShader(modelShaders[1]);
+	}
+	void updateModel(const glm::mat4& transform) {
+		objMat = transform;
+	}
+	void drawModel() {
+
+		glBindVertexArray(modelVao);
+		glUseProgram(modelProgram);
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
+		objMat = t1;
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
+		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
+		glUseProgram(0);
+		glBindVertexArray(0);
+	}
+
+	void drawModel2() {
+
+		glBindVertexArray(modelVao);
+		glUseProgram(modelProgram);
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
+		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
+		glUseProgram(0);
+		glBindVertexArray(0);
+
+	}
+
+}
