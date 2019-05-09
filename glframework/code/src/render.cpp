@@ -39,7 +39,7 @@ extern bool loadOBJ(const char * path,
 
 //Para realizar el Dolly Zoom trabajeros con nuestro propio struct Camera 
 struct Camera {
-	float CameraPosition[3] = { 0.f, -5.f, -24.f }; //Inicializamos la posicion inicial de la camara 
+	float CameraPosition[3] = { 0.f, -21.f, -70.0f }; //Inicializamos la posicion inicial de la camara 
 	float t; //Contador de tiempo
 	float d; // Distancia inicial entre la camara y el objeto
 	int width{ 1920 };
@@ -66,17 +66,46 @@ bool show_test_window = false;
 glm::vec3 LightColor(0.6f, 0.6f, 0.7f);
 glm::vec3 ObjectColor(0.8f, 0.8f, 0.8f);
 glm::vec3 lightPos(41.f, 23.f, 32.f);
-glm::vec3 ViewPos(-33.9f, 0.f, -20.f);
+glm::vec3 ViewPos(0.0f, 0.0f, 0.0f);
 float ambientStrength = 1.8f;
 float specularStrength = 35.3f;
 float shininess = 32.f;
 float FOV = glm::radians(50.f);
+float pos_0[3] = { -8.0f, 0.0f, 0.0f };
+float pos_1[3] = { -8.0f, 0.0f, 0.0f };
+float pos_2[3] = { -8.0f, 0.0f, 0.0f };
+
+int camera = 0;
+float distanceCenter = 24;
+float distanceCabin = (2 * 3.1415) / 20;
+float speedMultiplayer = 0.5;
+glm::vec3 centerScene = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 lightColor = glm::vec3(0.5f, 0.5f, 0.1f);
+bool focusTrump = false;
+
+//Exercise variables
+int exercise = 0;
+void SetExercise(int id)
+{
+	exercise = id;
+}
+int GetExercise()
+{
+	return exercise;
+}int timer = 0;
+
 
 void GUI() {
 	bool show = true;
 	ImGui::Begin("Simulation Parameters", &show, 0);
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
+
+	ImGui::DragFloat3("Pos Trump", &pos_0[0]);
+	ImGui::DragFloat3("Pos Pollo", &pos_1[0]);
+	ImGui::DragFloat3("Pos Cabina", &pos_2[0]);
+
+	ImGui::DragFloat("PosCenter", &distanceCenter, 0.1f);
 
 	ImGui::DragFloat("Ambient Strength", &ambientStrength, 0.1f);
 	ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
@@ -273,6 +302,7 @@ void GLcleanup() {
 }
 
 void GLrender(float dt) {
+
 	//Igualamos el tiempo (que se cuenta durante la ejecucion del programa) al contador de tiempo de la camara
 	cameraOptions->t = dt;
 
@@ -307,11 +337,60 @@ void GLrender(float dt) {
 	glLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-
+	glm::vec3 focusCabin;
+	glm::vec3 camaraTrumpChicken;
 	//Realiazmos las transformaciones necesarias para colocar la camara delante de nuestro modelo
-	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
-	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
-	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
+	RV::_modelView = glm::mat4(1.f);
+	switch (camera)
+	{
+	case 0:
+		RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
+		RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
+		RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
+
+		//RV::_modelView = glm::translate(RV::_modelView, glm::vec3(0.0f, -20.0f, -70.0f));
+		//RV::_modelView = glm::rotate(RV::_modelView, glm::radians(60.0f), glm::vec3(0.f, 1.f, 0.f));
+		break;
+	case 1:
+		timer += dt;
+		if (timer / 100 > 4)
+		{
+			timer = 0;
+			focusTrump = !focusTrump;
+		}
+
+
+		if (focusTrump)
+		{
+			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) - 1, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
+			RV::_modelView = glm::lookAt(camaraTrumpChicken, glm::vec3(camaraTrumpChicken.x + 1, camaraTrumpChicken.y, camaraTrumpChicken.z), glm::vec3(0.0, 1.0, 0.0));
+		}
+		else
+		{
+			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) + 1.5, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 19, 0);
+			RV::_modelView = glm::lookAt(camaraTrumpChicken, glm::vec3(camaraTrumpChicken.x - 1, camaraTrumpChicken.y, camaraTrumpChicken.z), glm::vec3(0.0, 1.0, 0.0));
+		}
+		break;
+	case 2:
+		focusCabin = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin), distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
+		RV::_modelView = glm::lookAt(glm::vec3(focusCabin.x, focusCabin.y, focusCabin.z - 10), focusCabin, glm::vec3(0.0, 1.0, 0.0));
+		break;
+	case 3:
+		glm::mat4 matrix;
+		focusCabin = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin), distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
+		glm::vec3 focusCamara = glm::vec3(focusCabin.x, focusCabin.y - 10, focusCabin.z);
+		focusCabin = glm::vec3(focusCabin.x, focusCabin.y + 0.5, focusCabin.z);
+		matrix = glm::translate(matrix, focusCabin);
+		matrix = glm::rotate(matrix, (float)dt, glm::vec3(0.0, 1.0, 0.0));
+		glm::vec4 aux = glm::vec4(1.0);
+		aux = matrix * aux;
+		RV::_modelView = glm::lookAt(glm::vec3(aux.x, aux.y, aux.z), focusCamara, glm::vec3(0.0, 1.0, 0.0));
+		break;
+	}
+
+	//RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
+	//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
+	//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
@@ -319,11 +398,65 @@ void GLrender(float dt) {
 	RV::_projection = glm::perspective(FOV, (float)cameraOptions->width / (float)cameraOptions->height, RV::zNear, RV::zFar);
 
 	//Renderizamos los modelos 
-	MyLoadedModel::drawModel();
-	MyLoadedModel2::drawModel();
-	MyLoadedModel3::drawModel();
-	MyLoadedModel4::drawModel();
-	MyLoadedModel5::drawModel();
+
+	//MyLoadedModel3::drawModel();
+	glm::mat4 model;
+	std::cout << exercise << std::endl;
+	switch (exercise) {
+	case 0:
+		//Trump
+		model = glm::mat4(1.0);
+		model = glm::translate(model, { pos_0[0], pos_0[1], pos_0[2] });
+		model = glm::translate(model, glm::vec3(glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) + 1, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) - 2.5, 0)));
+		model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(0.005f));
+		MyLoadedModel2::updateModel(model);
+		MyLoadedModel2::drawModel();
+
+		//Chicken
+		model = glm::mat4(1.0);
+		model = glm::translate(model, { pos_1[0], pos_1[1], pos_1[2] });
+		model = glm::translate(model, glm::vec3(glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) - 0.5, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) - 2, 0)));
+		model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		model = glm::scale(model, glm::vec3(0.005f));
+		MyLoadedModel::updateModel(model);
+		MyLoadedModel::drawModel();
+
+		//Wheel
+		model = glm::mat4(1.0);
+		model = glm::translate(model, centerScene);
+		model = glm::rotate(model, (float)dt*speedMultiplayer, glm::vec3(0.0f, 0.0f, 1.0f));
+		model = glm::scale(model, glm::vec3(0.7f));
+		MyLoadedModel5::updateModel(model);
+		MyLoadedModel5::drawModel();
+
+		//Feet Wheel
+		model = glm::mat4(1.0);
+		model = glm::translate(model, centerScene);
+		model = glm::scale(model, glm::vec3(0.7f));
+		MyLoadedModel4::updateModel(model);
+		MyLoadedModel4::drawModel();
+
+		MyLoadedModel::drawModel();
+		MyLoadedModel2::drawModel();
+
+
+		for (int i = 0; i < 20; i++)
+		{
+			model = glm::mat4(1.0);
+			model = glm::translate(model, { -0.5f, 25.0f, pos_2[2] });
+			model = glm::translate(model, glm::vec3(glm::vec3(distanceCenter * cos((float)(dt * speedMultiplayer + distanceCabin * i)), distanceCenter * sin((float)(dt * speedMultiplayer + distanceCabin * i)), 0)));
+			model = glm::scale(model, glm::vec3(0.5f));
+			MyLoadedModel3::updateModel(model);
+			MyLoadedModel3::drawModel();
+		}
+		break;
+	case 1:
+		break;
+	case 2:
+		break;
+	}
+
 	Cube::drawCube();
 	ImGui::Render();
 }
@@ -861,8 +994,10 @@ namespace MyLoadedModel {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(8.0f, 4.8f, 0.0f));
-		objMat = t1;
+
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 10.0f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.1, 0.1f, 0.1f));
+		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -1015,8 +1150,9 @@ namespace MyLoadedModel2 {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
-		objMat = t1;
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-14.0f, 8.0f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.05, 0.05f, 0.05f));
+		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -1170,8 +1306,9 @@ namespace MyLoadedModel3 {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
-		objMat = t1;
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
+		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -1324,8 +1461,9 @@ namespace MyLoadedModel4 {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
-		objMat = t1;
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
+		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -1478,8 +1616,9 @@ namespace MyLoadedModel5 {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
-		objMat = t1;
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
+		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
