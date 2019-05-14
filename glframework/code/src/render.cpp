@@ -344,7 +344,7 @@ void GLinit(int width, int height) {
 	uvs.clear();
 	normals.clear();
 
-	res = loadOBJ("Wheel.obj", vertices, uvs, normals);
+	res = loadOBJ("untitled01.obj", vertices, uvs, normals);
 	Wheel::setupModel();
 	vertices.clear();
 	uvs.clear();
@@ -497,15 +497,6 @@ void GLrender(float dt) {
 			Chicken::updateModel(model);
 			Chicken::drawModel();
 
-			//Wheel
-			model = glm::mat4(1.0);
-			model = glm::translate(model, glm::vec3(0.0f, distanceCenter, 0.0f));
-			model = glm::rotate(model, (float)cT * speedMultiplayer, glm::vec3(0.0f, 0.0f, 1.0f));
-			model = glm::scale(model, glm::vec3(0.5f));
-
-			Wheel::updateModel(model);
-			Wheel::drawModel();
-
 
 			//Feet Wheel
 			model = glm::mat4(1.0);
@@ -523,6 +514,13 @@ void GLrender(float dt) {
 				Cabin::updateModel(model);
 				Cabin::drawModel();
 			}
+			//Wheel
+			model = glm::mat4(1.0);
+			model = glm::translate(model, glm::vec3(0.0f, 19, 0.0f));
+			model = glm::rotate(model, ((float)cT * speedMultiplayer), glm::vec3(0.0f, 0.0f, 1.0f));
+			model = glm::scale(model, glm::vec3(0.5f));
+			Wheel::updateModel(model);
+			Wheel::drawModel();
 		}
 		else {
 			//Cube Trump
