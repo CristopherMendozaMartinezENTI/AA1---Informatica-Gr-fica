@@ -13,6 +13,13 @@
 #include <SDL2\SDL.h>
 #include <time.h>
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/euler_angles.hpp>
+#include <glm/gtx/norm.hpp>
+
 #define NUM_CABIN 20
 double cT;
 
@@ -349,8 +356,6 @@ void GLinit(int width, int height) {
 }
 
 void GLcleanup() {
-	Box::cleanupBox();
-	Axis::cleanupAxis();
 	Chicken::cleanupModel();
 	Tump::cleanupModel();
 	Cabin::cleanupModel();
@@ -494,25 +499,10 @@ void GLrender(float dt) {
 
 			//Wheel
 			model = glm::mat4(1.0);
-	//		glm::mat4 original = glm::translate(glm::mat4(), glm::vec3(0.0f, 20.0f, 0.0f));
-	//		glm::mat4 translation = glm::translate(glm::mat4(), glm::vec3(0.0f, -20.0f, 0.0f));
-	//		glm::mat4 rotation = glm::rotate(glm::mat4(), (float)cT * speedMultiplayer, glm::vec3(0, 0, 1));
-	//		glm::mat4 scale = glm::scale(glm::mat4(), glm::vec3(0.5f));
+			model = glm::translate(model, glm::vec3(0.0f, distanceCenter, 0.0f));
+			model = glm::rotate(model, (float)cT * speedMultiplayer, glm::vec3(0.0f, 0.0f, 1.0f));
+			model = glm::scale(model, glm::vec3(0.5f));
 
-	//		glm::mat4 myModelMatrix = translation * rotation * scale;
-	//		model = myModelMatrix * original;
-
-	//		model = glm::translate(model, glm::vec3(0.0f, 0.0f, 1.0f));
-	//		model = glm::rotate(model, , glm::vec3(0.0f, 0.0f, 1.0f));
-	//		model = glm::translate(model, glm::vec3(0.0f, 0.0f, -1.0f));
-			glm::mat4 translation = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-			glm::mat4 origin = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
-			//glm::mat4 rotation = glm::rotate(model, (float)cT * speedMultiplayer, glm::vec3(0.0f, 0.0f, 1.0f));
-			glm::mat4 scale = glm::scale(model, glm::vec3(0.5f));
-
-
-			glm::mat4 myModelMatrix = translation  * scale * origin;
-			model = myModelMatrix;
 			Wheel::updateModel(model);
 			Wheel::drawModel();
 
@@ -1588,8 +1578,6 @@ namespace FeetWheel {
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
 		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
-		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
-		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -1742,6 +1730,7 @@ namespace Wheel {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
+
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
