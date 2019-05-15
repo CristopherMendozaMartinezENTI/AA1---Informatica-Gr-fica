@@ -81,6 +81,8 @@ bool modelsUp = true;
 //Variables que utilizaremos en la interfaz de usuario
 glm::vec3 LightColor(0.6f, 0.6f, 0.7f);
 glm::vec3 ObjectColor(0.8f, 0.8f, 0.8f);
+glm::vec3 ObjectColorTrump(0.8f, 0.8f, 0.8f);
+glm::vec3 ObjectColorChicken(0.8f, 0.8f, 0.8f);
 glm::vec3 lightPos(41.f, 23.f, 32.f);
 glm::vec3 ViewPos(0.0f, 0.0f, 0.0f);
 float ambientStrength = 1.8f;
@@ -140,7 +142,9 @@ void GUI() {
 	ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
 	ImGui::DragFloat("Shininess", &shininess, 0.1f);
 	ImGui::ColorEdit3("Light Color", &LightColor.x);
-	ImGui::ColorEdit3("Model Color", &ObjectColor.x);
+	ImGui::ColorEdit3("Model Color Assets", &ObjectColor.x);
+	ImGui::ColorEdit3("Model Color Trump", &ObjectColorTrump.x);
+	ImGui::ColorEdit3("Model Color Chicken", &ObjectColorChicken.x);
 	ImGui::DragFloat3("Light Pos", &lightPos.x);
 	ImGui::DragFloat3("View Pos", &ViewPos.x);
 	ImGui::DragFloat3("Camera Position", { cameraOptions->CameraPosition }, 0.05f);
@@ -235,7 +239,7 @@ namespace Chicken {
 	void drawModel();
 }
 
-namespace Tump {
+namespace Trump {
 	void setupModel();
 	void cleanupModel();
 	void updateModel(const glm::mat4& transform);
@@ -327,7 +331,7 @@ void GLinit(int width, int height) {
 	normals.clear();
 
 	res = loadOBJ("trump.obj", vertices, uvs, normals);
-	Tump::setupModel();
+	Trump::setupModel();
 	vertices.clear();
 	uvs.clear();
 	normals.clear();
@@ -357,7 +361,7 @@ void GLinit(int width, int height) {
 
 void GLcleanup() {
 	Chicken::cleanupModel();
-	Tump::cleanupModel();
+	Trump::cleanupModel();
 	Cabin::cleanupModel();
 	FeetWheel::cleanupModel();
 	Wheel::cleanupModel();
@@ -409,9 +413,9 @@ void GLrender(float dt) {
 	switch (camera)
 	{
 	case 0:
-		//RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
-		//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
-		//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
+		RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
+		RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
+		RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
 
 		RV::_modelView = glm::translate(RV::_modelView, glm::vec3(0.0f, -20.0f, -70.0f));
 		RV::_modelView = glm::rotate(RV::_modelView, glm::radians(45.0f), glm::vec3(0.f, 1.f, 0.f));
@@ -423,8 +427,6 @@ void GLrender(float dt) {
 			timer = 0;
 			focusTrump = !focusTrump;
 		}
-
-
 		if (focusTrump)
 		{
 			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) - 1, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
@@ -482,18 +484,18 @@ void GLrender(float dt) {
 			//Trump
 			model = glm::mat4(1.0);
 			model = glm::translate(model, centerScene);
-			model = glm::translate(model, glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.2f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 2.9f, 0));
+			model = glm::translate(model, glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.4f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 2.9f, 0));
 			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(0.007f));
-			Tump::updateModel(model);
-			Tump::drawModel();
+			model = glm::scale(model, glm::vec3(0.5f));
+			Trump::updateModel(model);
+			Trump::drawModel();
 
 			//Chicken
 			model = glm::mat4(1.0);
 			model = glm::translate(model, centerScene);
-			model = glm::translate(model, glm::vec3(distanceCenter * cos((float)(cT * speedMultiplayer + distanceCabin)) - 0.8f, distanceCenter * sin((float)(cT*speedMultiplayer + distanceCabin)) - 2.8f, 0));
+			model = glm::translate(model, glm::vec3(distanceCenter * cos((float)(cT * speedMultiplayer + distanceCabin)) - 0.3f, distanceCenter * sin((float)(cT*speedMultiplayer + distanceCabin)) - 2.8f, 0));
 			model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(0.0125f));
+			model = glm::scale(model, glm::vec3(0.2f));
 			Chicken::updateModel(model);
 			Chicken::drawModel();
 
@@ -508,7 +510,7 @@ void GLrender(float dt) {
 			for (int i = 0; i < NUM_CABIN; i++)
 			{
 				model = glm::mat4(1.0);
-				model = glm::translate(model, glm::vec3(centerScene.x, (centerScene.y - centerScene.y) + centerCabine.y, centerScene.z));
+				model = glm::translate(model, glm::vec3(centerScene.x, ((centerScene.y - centerScene.y)) + centerCabine.y, centerScene.z));
 				model = glm::translate(model, glm::vec3(distanceCenter*cos((float)(cT*speedMultiplayer + distanceCabin * i)), distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin * i), 0));
 				model = glm::scale(model, glm::vec3(0.5f));
 				Cabin::updateModel(model);
@@ -517,7 +519,7 @@ void GLrender(float dt) {
 
 			//Wheel
 			model = glm::mat4(1.0);
-			model = glm::translate(model, glm::vec3(0.0f, 19, 0.0f));
+			model = glm::translate(model, glm::vec3(centerScene.x, ((centerScene.y - centerScene.y)+2) + centerCabine.y, centerScene.z));
 			model = glm::rotate(model, ((float )cT * speedMultiplayer), glm::vec3(0.0f, 0.0f, 1.0f));
 			model = glm::scale(model, glm::vec3(0.5f));
 			Wheel::updateModel(model);
@@ -558,7 +560,7 @@ void GLrender(float dt) {
 		break;
 	}
 
-	//Cube::drawCube();
+	Cube::drawCube();
 	ImGui::Render();
 }
 
@@ -829,8 +831,8 @@ namespace Cube
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-10.0f, 15.0f, -10.0f));
-		glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(1.0f, 1.0f, 1.0f));
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-10.0f, 40.0f, -10.0f));
+		glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
 		objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
@@ -1119,7 +1121,7 @@ namespace Chicken {
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
 		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColorChicken.x, ObjectColorChicken.y, ObjectColorChicken.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
@@ -1152,7 +1154,7 @@ namespace Chicken {
 }
 
 ////////////////////////////////////////////////// MyModel2
-namespace Tump {
+namespace Trump {
 	GLuint modelVao;
 	GLuint modelVbo[3];
 	GLuint modelShaders[2];
@@ -1218,7 +1220,16 @@ namespace Tump {
 		out_Color = vec4(result, 1.0); \n\
 	}";
 
+	const char* shaderSingleColor = 
+	"#version 330\n\
+	void main()\ {\n\
+			FragColor = vec4(0.04, 0.28, 0.26, 1.0);\n\
+	}";
+
 	void setupModel() {
+		glEnable(GL_STENCIL_TEST);
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); 
+
 		glGenVertexArrays(1, &modelVao);
 		glBindVertexArray(modelVao);
 		glGenBuffers(3, modelVbo);
@@ -1262,6 +1273,14 @@ namespace Tump {
 		objMat = transform;
 	}
 	void drawModel() {
+		glEnable(GL_STENCIL_TEST);
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+
+		glEnable(GL_DEPTH_TEST);
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+		glStencilMask(0x00); // make sure we don't update the stencil buffer while drawing the floor
+		glStencilMask(0xFF);
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
@@ -1274,7 +1293,7 @@ namespace Tump {
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
 		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColorTrump.x, ObjectColorTrump.y, ObjectColorTrump.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
@@ -1417,13 +1436,10 @@ namespace Cabin {
 	void updateModel(const glm::mat4& transform) {
 		objMat = transform;
 	}
-	void drawModel() {
 
+	void drawModel() {
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
-		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
-		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -1441,7 +1457,6 @@ namespace Cabin {
 	}
 
 	void drawModel2() {
-
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
