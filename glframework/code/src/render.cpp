@@ -3,33 +3,49 @@
 #include <glm\gtc\matrix_transform.hpp>
 #include <cstdio>
 #include <cassert>
-#include <glm/gtc/matrix_transform.hpp> // lookAt
 #include "GL_framework.h"
 #include <vector>
 #include <imgui\imgui.h>
 #include <imgui\imgui_impl_sdl_gl3.h>
-#include <iostream>
 #include <glm/gtx/transform.hpp>
+#include <iostream>
+#include <windows.h>
+#include <SDL2\SDL.h>
+#include <time.h>
 
-std::vector< glm::vec3 > verticesChicken;
-std::vector< glm::vec2 > uvsChicken;
-std::vector< glm::vec3 > normalsChicken;
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/euler_angles.hpp>
+#include <glm/gtx/norm.hpp>
 
-std::vector< glm::vec3 > verticesTrump;
-std::vector< glm::vec2 > uvsTrump;
-std::vector< glm::vec3 > normalsTrump;
+#define NUM_CABIN 20
+double cT;
 
-std::vector< glm::vec3 > verticesCabine;
-std::vector< glm::vec2 > uvsCabine;
-std::vector< glm::vec3 > normalsCabine;
+std::vector< glm::vec3 > vertices;
+std::vector< glm::vec2 > uvs;
+std::vector< glm::vec3 > normals;
 
-std::vector< glm::vec3 > verticesSupports;
-std::vector< glm::vec2 > uvsSupports;
-std::vector< glm::vec3 > normalsSupports;
-
-std::vector< glm::vec3 > verticesWheel;
-std::vector< glm::vec2 > uvsWheel;
-std::vector< glm::vec3 > normalsWheel;
+//std::vector< glm::vec3 > verticesChicken;
+//std::vector< glm::vec2 > uvsChicken;
+//std::vector< glm::vec3 > normalsChicken;
+//
+//std::vector< glm::vec3 > verticesTrump;
+//std::vector< glm::vec2 > uvsTrump;
+//std::vector< glm::vec3 > normalsTrump;
+//
+//std::vector< glm::vec3 > verticesCabine;
+//std::vector< glm::vec2 > uvsCabine;
+//std::vector< glm::vec3 > normalsCabine;
+//
+//std::vector< glm::vec3 > verticesSupports;
+//std::vector< glm::vec2 > uvsSupports;
+//std::vector< glm::vec3 > normalsSupports;
+//
+//std::vector< glm::vec3 > verticesWheel;
+//std::vector< glm::vec2 > uvsWheel;
+//std::vector< glm::vec3 > normalsWheel;
 
 extern bool loadOBJ(const char * path,
 	std::vector < glm::vec3 > & out_vertices,
@@ -39,7 +55,7 @@ extern bool loadOBJ(const char * path,
 
 //Para realizar el Dolly Zoom trabajeros con nuestro propio struct Camera 
 struct Camera {
-	float CameraPosition[3] = { 0.f, -5.f, -24.f }; //Inicializamos la posicion inicial de la camara 
+	float CameraPosition[3] = { 0.f, -21.f, -70.0f }; //Inicializamos la posicion inicial de la camara 
 	float t; //Contador de tiempo
 	float d; // Distancia inicial entre la camara y el objeto
 	int width{ 1920 };
@@ -61,22 +77,64 @@ struct Camera {
 Camera *cameraOptions;
 
 bool show_test_window = false;
-
+bool modelsUp = true;
 //Variables que utilizaremos en la interfaz de usuario
 glm::vec3 LightColor(0.6f, 0.6f, 0.7f);
 glm::vec3 ObjectColor(0.8f, 0.8f, 0.8f);
-glm::vec3 lightPos(50, 0, 50);
-glm::vec3 ViewPos(-30,0,40);
-float ambientStrength = 0.5;
-float specularStrength = 0.3;
-float shininess = 100;
+glm::vec3 lightPos(41.f, 23.f, 32.f);
+glm::vec3 ViewPos(-33.9f, 0.f, -20.f);
+float ambientStrength = 1.8f;
+float specularStrength = 35.3f;
+float shininess = 32.f;
 float FOV = glm::radians(50.f);
+
+//glm::vec3 centerTrump = glm::vec3(0.0f, 20.f, 0.0f);
+//glm::vec3 centerChicken = glm::vec3(0.0f, 20.f, 0.0f);
+//glm::vec3 centerCubeTrump = glm::vec3(0.0f, 20.f, 0.0f);
+//glm::vec3 centerCubeChicken = glm::vec3(0.0f, 20.f, 0.0f);
+//glm::vec3 centerCabine = glm::vec3(0.0f, 20.f, 0.0f);
+//glm::vec3 centerFeetWheel = glm::vec3(0.0f, 20.f, 0.0f);
+
+glm::vec3 centerTrump = glm::vec3(-16.8f, 30.7f, 0.0f);
+glm::vec3 centerChicken = glm::vec3(-16.3f, 30.5f, 0.0f);
+glm::vec3 centerCubeTrump = glm::vec3(-16.8f, 27.0f, 0.0f);
+glm::vec3 centerCubeChicken = glm::vec3(-16.3f, 27.0f, 0.0f);
+glm::vec3 centerCabine = glm::vec3(-0.3f, 16.8f, 0.0f);
+glm::vec3 centerFeetWheel = glm::vec3(0.0f, 0.0f, 0.0f);
+glm::vec3 centerScene = glm::vec3(0.0f, 20.0f, 0.0f);
+
+int camera = 0;
+float distanceCenter = 16.6f;
+float distanceCabin = (2 * 3.1415) / NUM_CABIN;
+float speedMultiplayer = 0.5f;
+glm::vec3 lightColor = glm::vec3(0.5f, 0.5f, 0.1f);
+bool focusTrump = false;
+
+//Exercise variables
+int exercise = 0;
+void SetExercise(int id)
+{
+	exercise = id;
+}
+int GetExercise()
+{
+	return exercise;
+}int timer = 0;
+
 
 void GUI() {
 	bool show = true;
 	ImGui::Begin("Simulation Parameters", &show, 0);
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
+
+	ImGui::DragFloat3("Pos Trump", &centerTrump.x);
+	ImGui::DragFloat3("Pos Pollo", &centerChicken.x);
+	ImGui::DragFloat3("Pos Cabina", &centerCabine.x);
+	ImGui::DragFloat3("Feet Wheel", &centerFeetWheel.x);
+	
+	ImGui::DragFloat("PosCenter", &distanceCenter, 0.1f);
+	ImGui::DragFloat("Speed", &speedMultiplayer, 0.1f);
 
 	ImGui::DragFloat("Ambient Strength", &ambientStrength, 0.1f);
 	ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
@@ -86,6 +144,17 @@ void GUI() {
 	ImGui::DragFloat3("Light Pos", &lightPos.x);
 	ImGui::DragFloat3("View Pos", &ViewPos.x);
 	ImGui::DragFloat3("Camera Position", { cameraOptions->CameraPosition }, 0.05f);
+	
+	if (ImGui::Button("Modelos")) {
+		modelsUp = !modelsUp;
+	}
+
+	if (ImGui::Button("Exercice")) {
+		if (exercise == 2)
+			exercise = 0;
+		else
+			exercise++;
+	}
 
 	if (ImGui::Button("Start Dolly Zoom")) {
 		cameraOptions->DollyZoom = !cameraOptions->DollyZoom;
@@ -138,14 +207,19 @@ namespace Box {
 	void setupBox();
 	void cleanupBox();
 	void drawBox();
+	void updateCube(const glm::mat4& transform);
 }
 
 namespace Cube {
 	void setupCube();
 	void cleanupCube();
 	void drawCube();
-	void draw2Cubes();
+	void drawTrump();
+	void drawChicken();
+
 	void draw2CubesMore();
+	void updateCube(const glm::mat4& transform);
+
 }
 
 namespace Axis {
@@ -154,35 +228,35 @@ namespace Axis {
 	void drawAxis();
 }
 
-namespace MyLoadedModel {
+namespace Chicken {
 	void setupModel();
 	void cleanupModel();
 	void updateModel(const glm::mat4& transform);
 	void drawModel();
 }
 
-namespace MyLoadedModel2 {
+namespace Tump {
 	void setupModel();
 	void cleanupModel();
 	void updateModel(const glm::mat4& transform);
 	void drawModel();
 }
 
-namespace MyLoadedModel3 {
+namespace Cabin {
 	void setupModel();
 	void cleanupModel();
 	void updateModel(const glm::mat4& transform);
 	void drawModel();
 }
 
-namespace MyLoadedModel4 {
+namespace FeetWheel {
 	void setupModel();
 	void cleanupModel();
 	void updateModel(const glm::mat4& transform);
 	void drawModel();
 }
 
-namespace MyLoadedModel5 {
+namespace Wheel {
 	void setupModel();
 	void cleanupModel();
 	void updateModel(const glm::mat4& transform);
@@ -246,33 +320,55 @@ void GLinit(int width, int height) {
 	RV::_projection = glm::perspective(FOV, (float)width / (float)height, RV::zNear, RV::zFar);
 
 	//Hacemos un setup de todos los elementos dentro de la escena 
-	bool res = loadOBJ("chicken.obj", verticesChicken, uvsChicken, normalsChicken);
-	bool res2 = loadOBJ("trump.obj", verticesTrump, uvsTrump, normalsTrump);
-	bool res3 = loadOBJ("Cabine.obj", verticesCabine, uvsCabine, normalsCabine);
-	bool res4 = loadOBJ("Supports.obj", verticesSupports, uvsSupports, normalsSupports);
-	bool res5 = loadOBJ("Wheel.obj", verticesWheel, uvsWheel, normalsWheel);
+	bool res =  loadOBJ("chicken.obj", vertices, uvs, normals);
+	Chicken::setupModel();
+	vertices.clear();
+	uvs.clear();
+	normals.clear();
 
-	MyLoadedModel::setupModel();
-	MyLoadedModel2::setupModel();
-	MyLoadedModel3::setupModel();
-	MyLoadedModel4::setupModel();
-	MyLoadedModel5::setupModel();
+	res = loadOBJ("trump.obj", vertices, uvs, normals);
+	Tump::setupModel();
+	vertices.clear();
+	uvs.clear();
+	normals.clear();
+
+	res = loadOBJ("Cabine.obj", vertices, uvs, normals);
+	Cabin::setupModel();
+	vertices.clear();
+	uvs.clear();
+	normals.clear();
+
+	res = loadOBJ("Supports.obj", vertices, uvs, normals);
+	FeetWheel::setupModel();
+	vertices.clear();
+	uvs.clear();
+	normals.clear();
+
+	res = loadOBJ("untitled01.obj", vertices, uvs, normals);
+	Wheel::setupModel();
+	vertices.clear();
+	uvs.clear();
+	normals.clear();
+
 	Box::setupBox();
 	Cube::setupCube();
 
 }
 
 void GLcleanup() {
-	Box::cleanupBox();
-	Axis::cleanupAxis();
-	MyLoadedModel::cleanupModel();
-	MyLoadedModel2::cleanupModel();
-	MyLoadedModel3::cleanupModel();
-	MyLoadedModel4::cleanupModel();
-	MyLoadedModel5::cleanupModel();
+	Chicken::cleanupModel();
+	Tump::cleanupModel();
+	Cabin::cleanupModel();
+	FeetWheel::cleanupModel();
+	Wheel::cleanupModel();
+	Cube::cleanupCube();
 }
 
+
 void GLrender(float dt) {
+	cT = (double)SDL_GetTicks() / 1000.0;;
+
+
 	//Igualamos el tiempo (que se cuenta durante la ejecucion del programa) al contador de tiempo de la camara
 	cameraOptions->t = dt;
 
@@ -303,27 +399,81 @@ void GLrender(float dt) {
 
 	RV::_modelView = glm::mat4(1.f);
 
+	glm::vec3 focusCabin;
+	glm::vec3 camaraTrumpChicken;
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	//Realiazmos las transformaciones necesarias para colocar la camara delante de nuestro modelo
-	RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
-	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
-	RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
+	switch (camera)
+	{
+	case 0:
+		//RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
+		//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
+		//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
+
+		RV::_modelView = glm::translate(RV::_modelView, glm::vec3(0.0f, -20.0f, -70.0f));
+		RV::_modelView = glm::rotate(RV::_modelView, glm::radians(45.0f), glm::vec3(0.f, 1.f, 0.f));
+		break;
+	case 1:
+		timer += dt;
+		if (timer / 100 > 4)
+		{
+			timer = 0;
+			focusTrump = !focusTrump;
+		}
+
+
+		if (focusTrump)
+		{
+			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) - 1, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
+			RV::_modelView = glm::lookAt(camaraTrumpChicken, glm::vec3(camaraTrumpChicken.x + 1, camaraTrumpChicken.y, camaraTrumpChicken.z), glm::vec3(0.0, 1.0, 0.0));
+		}
+		else
+		{
+			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) + 1.5, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 19, 0);
+			RV::_modelView = glm::lookAt(camaraTrumpChicken, glm::vec3(camaraTrumpChicken.x - 1, camaraTrumpChicken.y, camaraTrumpChicken.z), glm::vec3(0.0, 1.0, 0.0));
+		}
+		break;
+	case 2:
+		focusCabin = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin), distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
+		RV::_modelView = glm::lookAt(glm::vec3(focusCabin.x, focusCabin.y, focusCabin.z - 10), focusCabin, glm::vec3(0.0, 1.0, 0.0));
+		break;
+	case 3:
+		glm::mat4 matrix;
+		focusCabin = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin), distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
+		glm::vec3 focusCamara = glm::vec3(focusCabin.x, focusCabin.y - 10, focusCabin.z);
+		focusCabin = glm::vec3(focusCabin.x, focusCabin.y + 0.5, focusCabin.z);
+		matrix = glm::translate(matrix, focusCabin);
+		matrix = glm::rotate(matrix, (float)dt, glm::vec3(0.0, 1.0, 0.0));
+		glm::vec4 aux = glm::vec4(1.0);
+		aux = matrix * aux;
+		RV::_modelView = glm::lookAt(glm::vec3(aux.x, aux.y, aux.z), focusCamara, glm::vec3(0.0, 1.0, 0.0));
+		break;
+	}
 
 	RV::_MVP = RV::_projection * RV::_modelView;
+
+
+
+	//Realiazmos las transformaciones necesarias para colocar la camara delante de nuestro modelo
+	//RV::_modelView = glm::mat4(1.f);
+
+	//RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
+	//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
+	//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
+
 
 	//Realizamos la proyeccion respecto al FOV. Este varia durante el dolly zoom, de esta manera creamos ese efecto optico.
 	RV::_projection = glm::perspective(FOV, (float)cameraOptions->width / (float)cameraOptions->height, RV::zNear, RV::zFar);
 
 	//Renderizamos los modelos 
-	//MyLoadedModel::drawModel();
-	//MyLoadedModel2::drawModel();
+	MyLoadedModel::drawModel();
+	MyLoadedModel2::drawModel();
 	MyLoadedModel3::drawModel();
-	//MyLoadedModel4::drawModel();
-	//MyLoadedModel5::drawModel();
+	MyLoadedModel4::drawModel();
+	MyLoadedModel5::drawModel();
 	Cube::drawCube();
 	ImGui::Render();
 }
@@ -519,6 +669,8 @@ namespace Cube
 		20, 21, 22, 23, UCHAR_MAX
 	};
 
+
+
 	const char* cube_vertShader =
 		"#version 330\n\
 	in vec3 in_Position;\n\
@@ -540,6 +692,7 @@ namespace Cube
 	void main() {\n\
 		out_Color = vec4(color.xyz * dot(vert_Normal, mv_Mat*vec4(0.0, 1.0, 0.0, 0.0)) + color.xyz * 0.3, 1.0 );\n\
 	}";
+
 
 	void setupCube() {
 		glGenVertexArrays(1, &cubeVao);
@@ -576,7 +729,7 @@ namespace Cube
 	}
 
 	void cleanupCube() {
-		glDeleteBuffers(3, cubeVbo);
+		glDeleteBuffers(2, cubeVbo);
 		glDeleteVertexArrays(1, &cubeVao);
 
 		glDeleteProgram(cubeProgram);
@@ -606,21 +759,35 @@ namespace Cube
 		glDisable(GL_PRIMITIVE_RESTART);
 	}
 
-	void draw2Cubes() {
+	void drawChicken() {
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 2.0f, -8.0f));
-		glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
-		objMat = t1 * s1;
+
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.1f, 1.f, 1.f, 0.f);
 		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
-		t1 = glm::translate(glm::mat4(), glm::vec3(4.0f, 2.0f, -8.0f));
-		objMat = t1 * s1;
+
+		//glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
+		glUseProgram(0);
+		glBindVertexArray(0);
+		glDisable(GL_PRIMITIVE_RESTART);
+	}
+	void drawTrump() {
+		glEnable(GL_PRIMITIVE_RESTART);
+		glBindVertexArray(cubeVao);
+		glUseProgram(cubeProgram);
+
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.1f, 1.f, 1.f, 0.f);
+		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
+
+		//glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -631,17 +798,14 @@ namespace Cube
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 2.0f, 0.0f));
-		glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
-		objMat = t1 * s1;
+
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.1f, 1.f, 1.f, 0.f);
 		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
-		t1 = glm::translate(glm::mat4(), glm::vec3(8.0f, 2.0f, .0f));
-		objMat = t1 * s1;
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+
+		//glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -748,7 +912,7 @@ namespace Axis {
 }
 
 ////////////////////////////////////////////////// MyModel
-namespace MyLoadedModel {
+namespace Chicken {
 	GLuint modelVao;
 	GLuint modelVbo[3];
 	GLuint modelShaders[2];
@@ -808,13 +972,13 @@ namespace MyLoadedModel {
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[0]);
 
-		glBufferData(GL_ARRAY_BUFFER, verticesChicken.size() * sizeof(glm::vec3), &verticesChicken[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[1]);
 
-		glBufferData(GL_ARRAY_BUFFER, normalsChicken.size() * sizeof(glm::vec3), &normalsChicken[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
 
@@ -850,9 +1014,9 @@ namespace MyLoadedModel {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
 		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
@@ -889,7 +1053,7 @@ namespace MyLoadedModel {
 }
 
 ////////////////////////////////////////////////// MyModel2
-namespace MyLoadedModel2 {
+namespace Tump {
 	GLuint modelVao;
 	GLuint modelVbo[3];
 	GLuint modelShaders[2];
@@ -949,13 +1113,13 @@ namespace MyLoadedModel2 {
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[0]);
 
-		glBufferData(GL_ARRAY_BUFFER, verticesTrump.size() * sizeof(glm::vec3), &verticesTrump[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[1]);
 
-		glBufferData(GL_ARRAY_BUFFER, normalsTrump.size() * sizeof(glm::vec3), &normalsTrump[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
 
@@ -991,9 +1155,9 @@ namespace MyLoadedModel2 {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
 		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
@@ -1031,7 +1195,7 @@ namespace MyLoadedModel2 {
 }
 
 ////////////////////////////////////////////////// MyModel3
-namespace MyLoadedModel3 {
+namespace Cabin {
 	GLuint modelVao;
 	GLuint modelVbo[3];
 	GLuint modelShaders[2];
@@ -1091,13 +1255,13 @@ namespace MyLoadedModel3 {
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[0]);
 
-		glBufferData(GL_ARRAY_BUFFER, verticesCabine.size() * sizeof(glm::vec3), &verticesCabine[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[1]);
 
-		glBufferData(GL_ARRAY_BUFFER, normalsCabine.size() * sizeof(glm::vec3), &normalsCabine[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
 
@@ -1133,9 +1297,9 @@ namespace MyLoadedModel3 {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
 		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "Kd"), LightColor.x, LightColor.y, LightColor.z);
@@ -1172,7 +1336,7 @@ namespace MyLoadedModel3 {
 }
 
 ////////////////////////////////////////////////// MyModel4
-namespace MyLoadedModel4 {
+namespace FeetWheel {
 	GLuint modelVao;
 	GLuint modelVbo[3];
 	GLuint modelShaders[2];
@@ -1232,13 +1396,13 @@ namespace MyLoadedModel4 {
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[0]);
 
-		glBufferData(GL_ARRAY_BUFFER, verticesSupports.size() * sizeof(glm::vec3), &verticesSupports[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[1]);
 
-		glBufferData(GL_ARRAY_BUFFER, normalsSupports.size() * sizeof(glm::vec3), &normalsSupports[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
 
@@ -1274,9 +1438,9 @@ namespace MyLoadedModel4 {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
 		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
@@ -1313,7 +1477,7 @@ namespace MyLoadedModel4 {
 }
 
 ////////////////////////////////////////////////// MyModel5
-namespace MyLoadedModel5 {
+namespace Wheel {
 	GLuint modelVao;
 	GLuint modelVbo[3];
 	GLuint modelShaders[2];
@@ -1373,13 +1537,13 @@ namespace MyLoadedModel5 {
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[0]);
 
-		glBufferData(GL_ARRAY_BUFFER, verticesWheel.size() * sizeof(glm::vec3), &verticesWheel[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(glm::vec3), &vertices[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)0, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, modelVbo[1]);
 
-		glBufferData(GL_ARRAY_BUFFER, normalsWheel.size() * sizeof(glm::vec3), &normalsWheel[0], GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(glm::vec3), &normals[0], GL_STATIC_DRAW);
 		glVertexAttribPointer((GLuint)1, 3, GL_FLOAT, GL_FALSE, 0, 0);
 		glEnableVertexAttribArray(1);
 
@@ -1415,17 +1579,17 @@ namespace MyLoadedModel5 {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
 		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "eye_position"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "material_kd"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "material_ks"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "material_shininess"), shininess);
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -1446,9 +1610,50 @@ namespace MyLoadedModel5 {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
-		glDrawArrays(GL_TRIANGLES, 0, 50000);
+		glDrawArrays(GL_TRIANGLES, 0, 10000);
 		glUseProgram(0);
 		glBindVertexArray(0);
 
 	}
 }
+glm::vec3 lightPos(50, 0, 50);
+glm::vec3 ViewPos(-30,0,40);
+float ambientStrength = 0.5;
+float specularStrength = 0.3;
+float shininess = 100;
+	//MyLoadedModel::drawModel();
+	//MyLoadedModel2::drawModel();
+	MyLoadedModel3::drawModel();
+	//MyLoadedModel4::drawModel();
+	//MyLoadedModel5::drawModel();
+	Cube::drawCube();
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(8.0f, 4.8f, 0.0f));
+		objMat = t1;
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
+		objMat = t1;
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
+		objMat = t1;
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
+		objMat = t1;
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
+		objMat = t1;
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform3f(glGetUniformLocation(modelProgram, "eye_position"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_kd"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_ks"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_shininess"), shininess);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
