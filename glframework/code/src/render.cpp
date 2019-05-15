@@ -65,11 +65,11 @@ bool show_test_window = false;
 //Variables que utilizaremos en la interfaz de usuario
 glm::vec3 LightColor(0.6f, 0.6f, 0.7f);
 glm::vec3 ObjectColor(0.8f, 0.8f, 0.8f);
-glm::vec3 lightPos(41.f, 23.f, 32.f);
-glm::vec3 ViewPos(-33.9f, 0.f, -20.f);
-float ambientStrength = 1.8f;
-float specularStrength = 35.3f;
-float shininess = 32.f;
+glm::vec3 lightPos(50, 0, 50);
+glm::vec3 ViewPos(-30,0,40);
+float ambientStrength = 0.5;
+float specularStrength = 0.3;
+float shininess = 100;
 float FOV = glm::radians(50.f);
 
 void GUI() {
@@ -319,11 +319,11 @@ void GLrender(float dt) {
 	RV::_projection = glm::perspective(FOV, (float)cameraOptions->width / (float)cameraOptions->height, RV::zNear, RV::zFar);
 
 	//Renderizamos los modelos 
-	MyLoadedModel::drawModel();
-	MyLoadedModel2::drawModel();
+	//MyLoadedModel::drawModel();
+	//MyLoadedModel2::drawModel();
 	MyLoadedModel3::drawModel();
-	MyLoadedModel4::drawModel();
-	MyLoadedModel5::drawModel();
+	//MyLoadedModel4::drawModel();
+	//MyLoadedModel5::drawModel();
 	Cube::drawCube();
 	ImGui::Render();
 }
@@ -756,62 +756,49 @@ namespace MyLoadedModel {
 	glm::mat4 objMat = glm::mat4(1.f);
 
 	const char* model_vertShader =
-		"#version 330\n\
-	in vec3 in_Position;\n\
-	in vec3 in_Normal;\n\
-	uniform vec3 lightPos;\n\
-	out vec4 vert_Normal;\n\
-	out vec3 Normal; \n\
-	out vec3 FragPos; \n\
-	uniform mat4 objMat;\n\
-	uniform mat4 mv_Mat;\n\
-	uniform mat4 mvpMat;\n\
+	"#version 330\n\
+	layout(location = 0) in vec3 in_position;\n\
+	layout(location = 1) in vec3 in_normal;\n\
+	uniform mat4 model_matrix, view_matrix, projection_matrix;\n\
+	out vec3 world_pos;\n\
+	out vec3 world_normal;\n\
 	void main() {\n\
-		gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-		FragPos = vec3(objMat * vec4(in_Position, 1.0)); \n\
-		Normal = in_Normal; \n\
+		world_pos = mat3(model_matrix) * in_position;\n\
+		world_normal = normalize(mat3(model_matrix) * in_normal);\n\
+		gl_Position = projection_matrix * view_matrix*model_matrix*vec4(in_position, 1);\n\
 	}";
-
 
 	const char* model_fragShader =
 		"#version 330\n\
-	in vec4 vert_Normal;\n\
-	in vec3 FragPos; \n\
-	out vec4 out_Color;\n\
-	in vec3 Normal; \n\
-	uniform mat4 mv_Mat;\n\
-	uniform vec3 LightColor; \n\
-	uniform vec3 ObjectColor; \n\
-	uniform vec3 lightPos; \n\
-	uniform vec3 viewPos; \n\
-	uniform float ambientStrength;\n\
-	uniform float specularStrength; \n\
-	uniform float shininess; \n\
+	layout(location = 0) out vec4 out_color;\n\
+	uniform vec3 light_position;\n\
+	uniform vec3 eye_position;\n\
+	uniform int material_shininess;\n\
+	uniform float material_kd;\n\
+	uniform float material_ks;\n\
+	vec3 ambinet = vec3(0.90, 0.0, 0.20);\n\
+	vec3 Kd = vec3(0.30,0.80,0.10);\n\
+	in vec3 world_pos;\n\
+	in vec3 world_normal;\n\
+	int levels = 5;\n\
+	float scaleFactor = 1.0 / levels;\n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		vec3 color = vec3(0.90, 0.0, 0.20);\n\
+		vec3 Kd = vec3(0.30, 0.80, 0.10);\n\
+		vec3 L = normalize(light_position - world_pos);\n\
+		vec3 V = normalize(eye_position - world_pos);\n\
+		float difuza = max(0, dot(L, world_normal));\n\
+		Kd = Kd * material_kd* floor(difuza * levels) * scaleFactor;\n\
+		vec3 H = normalize(L + V);\n\
+		float speculara = 0;\n\
+		if (dot(L, world_normal) > 0.0)\n\
+		{\n\
+			speculara = material_ks * pow(max(0, dot(H, world_normal)), material_shininess);\n\
+		}\n\
+		float specMask = (pow(dot(H, world_normal), material_shininess) > 0.4) ? 1 : 0;\n\
+		float edgeMask = (dot(V, world_normal) > 0.2) ? 1 : 0;\n\
+		color = edgeMask * (color + Kd + speculara * specMask);\n\
+		out_color = vec4(color, 1);\n\
 	}";
 
 	void setupModel() {
@@ -863,17 +850,17 @@ namespace MyLoadedModel {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform3f(glGetUniformLocation(modelProgram, "eye_position"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_kd"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_ks"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_shininess"), shininess);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -911,61 +898,48 @@ namespace MyLoadedModel2 {
 
 	const char* model_vertShader =
 		"#version 330\n\
-	in vec3 in_Position;\n\
-	in vec3 in_Normal;\n\
-	uniform vec3 lightPos;\n\
-	out vec4 vert_Normal;\n\
-	out vec3 Normal; \n\
-	out vec3 FragPos; \n\
-	uniform mat4 objMat;\n\
-	uniform mat4 mv_Mat;\n\
-	uniform mat4 mvpMat;\n\
+	layout(location = 0) in vec3 in_position;\n\
+	layout(location = 1) in vec3 in_normal;\n\
+	uniform mat4 model_matrix, view_matrix, projection_matrix;\n\
+	out vec3 world_pos;\n\
+	out vec3 world_normal;\n\
 	void main() {\n\
-		gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-		FragPos = vec3(objMat * vec4(in_Position, 1.0)); \n\
-		Normal = in_Normal; \n\
+		world_pos = mat3(model_matrix) * in_position;\n\
+		world_normal = normalize(mat3(model_matrix) * in_normal);\n\
+		gl_Position = projection_matrix * view_matrix*model_matrix*vec4(in_position, 1);\n\
 	}";
-
 
 	const char* model_fragShader =
 		"#version 330\n\
-	in vec4 vert_Normal;\n\
-	in vec3 FragPos; \n\
-	out vec4 out_Color;\n\
-	in vec3 Normal; \n\
-	uniform mat4 mv_Mat;\n\
-	uniform vec3 LightColor; \n\
-	uniform vec3 ObjectColor; \n\
-	uniform vec3 lightPos; \n\
-	uniform vec3 viewPos; \n\
-	uniform float ambientStrength;\n\
-	uniform float specularStrength; \n\
-	uniform float shininess; \n\
+	layout(location = 0) out vec4 out_color;\n\
+	uniform vec3 light_position;\n\
+	uniform vec3 eye_position;\n\
+	uniform int material_shininess;\n\
+	uniform float material_kd;\n\
+	uniform float material_ks;\n\
+	vec3 ambinet = vec3(0.90, 0.0, 0.20);\n\
+	vec3 Kd = vec3(0.30,0.80,0.10);\n\
+	in vec3 world_pos;\n\
+	in vec3 world_normal;\n\
+	int levels = 5;\n\
+	float scaleFactor = 1.0 / levels;\n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		vec3 color = vec3(0.90, 0.0, 0.20);\n\
+		vec3 Kd = vec3(0.30, 0.80, 0.10);\n\
+		vec3 L = normalize(light_position - world_pos);\n\
+		vec3 V = normalize(eye_position - world_pos);\n\
+		float difuza = max(0, dot(L, world_normal));\n\
+		Kd = Kd * material_kd* floor(difuza * levels) * scaleFactor;\n\
+		vec3 H = normalize(L + V);\n\
+		float speculara = 0;\n\
+		if (dot(L, world_normal) > 0.0)\n\
+		{\n\
+			speculara = material_ks * pow(max(0, dot(H, world_normal)), material_shininess);\n\
+		}\n\
+		float specMask = (pow(dot(H, world_normal), material_shininess) > 0.4) ? 1 : 0;\n\
+		float edgeMask = (dot(V, world_normal) > 0.2) ? 1 : 0;\n\
+		color = edgeMask * (color + Kd + speculara * specMask);\n\
+		out_color = vec4(color, 1);\n\
 	}";
 
 	void setupModel() {
@@ -1017,17 +991,17 @@ namespace MyLoadedModel2 {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform3f(glGetUniformLocation(modelProgram, "eye_position"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_kd"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_ks"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_shininess"), shininess);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -1066,61 +1040,48 @@ namespace MyLoadedModel3 {
 
 	const char* model_vertShader =
 		"#version 330\n\
-	in vec3 in_Position;\n\
-	in vec3 in_Normal;\n\
-	uniform vec3 lightPos;\n\
-	out vec4 vert_Normal;\n\
-	out vec3 Normal; \n\
-	out vec3 FragPos; \n\
-	uniform mat4 objMat;\n\
-	uniform mat4 mv_Mat;\n\
-	uniform mat4 mvpMat;\n\
+	layout(location = 0) in vec3 in_position;\n\
+	layout(location = 1) in vec3 in_normal;\n\
+	uniform mat4 model_matrix, view_matrix, projection_matrix;\n\
+	out vec3 world_pos;\n\
+	out vec3 world_normal;\n\
 	void main() {\n\
-		gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-		FragPos = vec3(objMat * vec4(in_Position, 1.0)); \n\
-		Normal = in_Normal; \n\
+		world_pos = mat3(model_matrix) * in_position;\n\
+		world_normal = normalize(mat3(model_matrix) * in_normal);\n\
+		gl_Position = projection_matrix * view_matrix*model_matrix*vec4(in_position, 1);\n\
 	}";
-
 
 	const char* model_fragShader =
 		"#version 330\n\
-	in vec4 vert_Normal;\n\
-	in vec3 FragPos; \n\
-	out vec4 out_Color;\n\
-	in vec3 Normal; \n\
-	uniform mat4 mv_Mat;\n\
-	uniform vec3 LightColor; \n\
-	uniform vec3 ObjectColor; \n\
-	uniform vec3 lightPos; \n\
-	uniform vec3 viewPos; \n\
-	uniform float ambientStrength;\n\
-	uniform float specularStrength; \n\
-	uniform float shininess; \n\
+	layout(location = 0) out vec4 out_color;\n\
+	uniform vec3 light_position;\n\
+	uniform vec3 eye_position;\n\
+	uniform int material_shininess;\n\
+	uniform float material_kd;\n\
+	uniform float material_ks;\n\
+	uniform vec3 ambient;\n\
+	uniform vec3 color;\n\
+	in vec3 world_pos;\n\
+	in vec3 world_normal;\n\
+	uniform vec3 Kd;\n\
+	int levels = 5;\n\
+	float scaleFactor = 1.0 / levels;\n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		vec3 ambientLight = ambient;\n\
+		vec3 L = normalize(light_position - world_pos);\n\
+		vec3 V = normalize(eye_position - world_pos);\n\
+		float difuss = max(0, dot(L, world_normal));\n\
+		vec3 dis = material_kd * floor(difuss * levels) * scaleFactor;\n\
+		vec3 H = normalize(L + V);\n\
+		float specular = 0;\n\
+		if (dot(L, world_normal) > 0.0)\n\
+		{\n\
+			specular = material_ks * pow(max(0, dot(H, world_normal)), material_shininess);\n\
+		}\n\
+		float specMask = (pow(dot(H, world_normal), material_shininess) > 0.4) ? 1 : 0;\n\
+		float edgeMask = (dot(V, world_normal) > 0.2) ? 1 : 0;\n\
+		vec3 result = edgeMask * (color * dis + specular) * specMask;\n\
+		out_color = vec4(result, 1);\n\
 	}";
 
 	void setupModel() {
@@ -1172,17 +1133,17 @@ namespace MyLoadedModel3 {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "Kd"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "color"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "eye_position"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_kd"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_ks"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_shininess"), shininess);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -1220,61 +1181,48 @@ namespace MyLoadedModel4 {
 
 	const char* model_vertShader =
 		"#version 330\n\
-	in vec3 in_Position;\n\
-	in vec3 in_Normal;\n\
-	uniform vec3 lightPos;\n\
-	out vec4 vert_Normal;\n\
-	out vec3 Normal; \n\
-	out vec3 FragPos; \n\
-	uniform mat4 objMat;\n\
-	uniform mat4 mv_Mat;\n\
-	uniform mat4 mvpMat;\n\
+	layout(location = 0) in vec3 in_position;\n\
+	layout(location = 1) in vec3 in_normal;\n\
+	uniform mat4 model_matrix, view_matrix, projection_matrix;\n\
+	out vec3 world_pos;\n\
+	out vec3 world_normal;\n\
 	void main() {\n\
-		gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-		FragPos = vec3(objMat * vec4(in_Position, 1.0)); \n\
-		Normal = in_Normal; \n\
+		world_pos = mat3(model_matrix) * in_position;\n\
+		world_normal = normalize(mat3(model_matrix) * in_normal);\n\
+		gl_Position = projection_matrix * view_matrix*model_matrix*vec4(in_position, 1);\n\
 	}";
-
 
 	const char* model_fragShader =
 		"#version 330\n\
-	in vec4 vert_Normal;\n\
-	in vec3 FragPos; \n\
-	out vec4 out_Color;\n\
-	in vec3 Normal; \n\
-	uniform mat4 mv_Mat;\n\
-	uniform vec3 LightColor; \n\
-	uniform vec3 ObjectColor; \n\
-	uniform vec3 lightPos; \n\
-	uniform vec3 viewPos; \n\
-	uniform float ambientStrength;\n\
-	uniform float specularStrength; \n\
-	uniform float shininess; \n\
+	layout(location = 0) out vec4 out_color;\n\
+	uniform vec3 light_position;\n\
+	uniform vec3 eye_position;\n\
+	uniform int material_shininess;\n\
+	uniform float material_kd;\n\
+	uniform float material_ks;\n\
+	vec3 ambinet = vec3(0.90, 0.0, 0.20);\n\
+	vec3 Kd = vec3(0.30,0.80,0.10);\n\
+	in vec3 world_pos;\n\
+	in vec3 world_normal;\n\
+	int levels = 5;\n\
+	float scaleFactor = 1.0 / levels;\n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		vec3 color = vec3(0.90, 0.0, 0.20);\n\
+		vec3 Kd = vec3(0.30, 0.80, 0.10);\n\
+		vec3 L = normalize(light_position - world_pos);\n\
+		vec3 V = normalize(eye_position - world_pos);\n\
+		float difuza = max(0, dot(L, world_normal));\n\
+		Kd = Kd * material_kd* floor(difuza * levels) * scaleFactor;\n\
+		vec3 H = normalize(L + V);\n\
+		float speculara = 0;\n\
+		if (dot(L, world_normal) > 0.0)\n\
+		{\n\
+			speculara = material_ks * pow(max(0, dot(H, world_normal)), material_shininess);\n\
+		}\n\
+		float specMask = (pow(dot(H, world_normal), material_shininess) > 0.4) ? 1 : 0;\n\
+		float edgeMask = (dot(V, world_normal) > 0.2) ? 1 : 0;\n\
+		color = edgeMask * (color + Kd + speculara * specMask);\n\
+		out_color = vec4(color, 1);\n\
 	}";
 
 	void setupModel() {
@@ -1326,17 +1274,17 @@ namespace MyLoadedModel4 {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform3f(glGetUniformLocation(modelProgram, "eye_position"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_kd"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_ks"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_shininess"), shininess);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -1374,61 +1322,48 @@ namespace MyLoadedModel5 {
 
 	const char* model_vertShader =
 		"#version 330\n\
-	in vec3 in_Position;\n\
-	in vec3 in_Normal;\n\
-	uniform vec3 lightPos;\n\
-	out vec4 vert_Normal;\n\
-	out vec3 Normal; \n\
-	out vec3 FragPos; \n\
-	uniform mat4 objMat;\n\
-	uniform mat4 mv_Mat;\n\
-	uniform mat4 mvpMat;\n\
+	layout(location = 0) in vec3 in_position;\n\
+	layout(location = 1) in vec3 in_normal;\n\
+	uniform mat4 model_matrix, view_matrix, projection_matrix;\n\
+	out vec3 world_pos;\n\
+	out vec3 world_normal;\n\
 	void main() {\n\
-		gl_Position = mvpMat * objMat * vec4(in_Position, 1.0);\n\
-		vert_Normal = mv_Mat * objMat * vec4(in_Normal, 0.0);\n\
-		FragPos = vec3(objMat * vec4(in_Position, 1.0)); \n\
-		Normal = in_Normal; \n\
+		world_pos = mat3(model_matrix) * in_position;\n\
+		world_normal = normalize(mat3(model_matrix) * in_normal);\n\
+		gl_Position = projection_matrix * view_matrix*model_matrix*vec4(in_position, 1);\n\
 	}";
-
 
 	const char* model_fragShader =
 		"#version 330\n\
-	in vec4 vert_Normal;\n\
-	in vec3 FragPos; \n\
-	out vec4 out_Color;\n\
-	in vec3 Normal; \n\
-	uniform mat4 mv_Mat;\n\
-	uniform vec3 LightColor; \n\
-	uniform vec3 ObjectColor; \n\
-	uniform vec3 lightPos; \n\
-	uniform vec3 viewPos; \n\
-	uniform float ambientStrength;\n\
-	uniform float specularStrength; \n\
-	uniform float shininess; \n\
+	layout(location = 0) out vec4 out_color;\n\
+	uniform vec3 light_position;\n\
+	uniform vec3 eye_position;\n\
+	uniform int material_shininess;\n\
+	uniform float material_kd;\n\
+	uniform float material_ks;\n\
+	vec3 ambinet = vec3(0.90, 0.0, 0.20);\n\
+	vec3 Kd = vec3(0.30,0.80,0.10);\n\
+	in vec3 world_pos;\n\
+	in vec3 world_normal;\n\
+	int levels = 5;\n\
+	float scaleFactor = 1.0 / levels;\n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		vec3 color = vec3(0.90, 0.0, 0.20);\n\
+		vec3 Kd = vec3(0.30, 0.80, 0.10);\n\
+		vec3 L = normalize(light_position - world_pos);\n\
+		vec3 V = normalize(eye_position - world_pos);\n\
+		float difuza = max(0, dot(L, world_normal));\n\
+		Kd = Kd * material_kd* floor(difuza * levels) * scaleFactor;\n\
+		vec3 H = normalize(L + V);\n\
+		float speculara = 0;\n\
+		if (dot(L, world_normal) > 0.0)\n\
+		{\n\
+			speculara = material_ks * pow(max(0, dot(H, world_normal)), material_shininess);\n\
+		}\n\
+		float specMask = (pow(dot(H, world_normal), material_shininess) > 0.4) ? 1 : 0;\n\
+		float edgeMask = (dot(V, world_normal) > 0.2) ? 1 : 0;\n\
+		color = edgeMask * (color + Kd + speculara * specMask);\n\
+		out_color = vec4(color, 1);\n\
 	}";
 
 	void setupModel() {
@@ -1480,17 +1415,17 @@ namespace MyLoadedModel5 {
 		glUseProgram(modelProgram);
 		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
 		objMat = t1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "model_matrix"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "view_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "projection_matrix"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "light_position"), lightPos.x, lightPos.y, lightPos.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform3f(glGetUniformLocation(modelProgram, "eye_position"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_kd"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_ks"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "material_shininess"), shininess);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
