@@ -79,11 +79,11 @@ Camera *cameraOptions;
 bool show_test_window = false;
 bool modelsUp = true;
 //Variables que utilizaremos en la interfaz de usuario
-glm::vec3 LightColor(0.6f, 0.6f, 0.7f);
+glm::vec3 LightColor(0.4f, 0.4f, 0.8f);
 glm::vec3 ObjectColor(0.8f, 0.8f, 0.8f);
-glm::vec3 ObjectColorTrump(0.8f, 0.8f, 0.8f);
-glm::vec3 ObjectColorChicken(0.8f, 0.8f, 0.8f);
-glm::vec3 lightPos(41.f, 23.f, 32.f);
+glm::vec3 ObjectColorTrump(1.f, 0., 0.f);
+glm::vec3 ObjectColorChicken(1.f, 1.f, 0.f);
+glm::vec3 lightPos(-10.0f, 40.0f, -10.0f);
 glm::vec3 ViewPos(0.0f, 0.0f, 0.0f);
 float ambientStrength = 1.8f;
 float specularStrength = 35.3f;
@@ -109,7 +109,6 @@ int camera = 0;
 float distanceCenter = 16.6f;
 float distanceCabin = (2 * 3.1415) / NUM_CABIN;
 float speedMultiplayer = 0.5f;
-glm::vec3 lightColor = glm::vec3(0.5f, 0.5f, 0.1f);
 bool focusTrump = false;
 
 //Exercise variables
@@ -130,10 +129,10 @@ void GUI() {
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
-	ImGui::DragFloat3("Pos Trump", &centerTrump.x);
-	ImGui::DragFloat3("Pos Pollo", &centerChicken.x);
-	ImGui::DragFloat3("Pos Cabina", &centerCabine.x);
-	ImGui::DragFloat3("Feet Wheel", &centerFeetWheel.x);
+	//ImGui::DragFloat3("Pos Trump", &centerTrump.x);
+	//ImGui::DragFloat3("Pos Pollo", &centerChicken.x);
+	//ImGui::DragFloat3("Pos Cabina", &centerCabine.x);
+	//ImGui::DragFloat3("Feet Wheel", &centerFeetWheel.x);
 
 	ImGui::DragFloat("PosCenter", &distanceCenter, 0.1f);
 	ImGui::DragFloat("Speed", &speedMultiplayer, 0.1f);
@@ -755,8 +754,6 @@ namespace Cube
 		20, 21, 22, 23, UCHAR_MAX
 	};
 
-
-
 	const char* cube_vertShader =
 		"#version 330\n\
 	in vec3 in_Position;\n\
@@ -831,7 +828,7 @@ namespace Cube
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
-		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-10.0f, 40.0f, -10.0f));
+		glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(lightPos.x, lightPos.y, lightPos.z));
 		glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(5.0f, 5.0f, 5.0f));
 		objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
@@ -862,6 +859,7 @@ namespace Cube
 		glBindVertexArray(0);
 		glDisable(GL_PRIMITIVE_RESTART);
 	}
+
 	void drawTrump() {
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
@@ -1220,12 +1218,6 @@ namespace Trump {
 		out_Color = vec4(result, 1.0); \n\
 	}";
 
-	const char* shaderSingleColor = 
-	"#version 330\n\
-	void main()\ {\n\
-			FragColor = vec4(0.04, 0.28, 0.26, 1.0);\n\
-	}";
-
 	void setupModel() {
 		glEnable(GL_STENCIL_TEST);
 		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); 
@@ -1273,15 +1265,6 @@ namespace Trump {
 		objMat = transform;
 	}
 	void drawModel() {
-		glEnable(GL_STENCIL_TEST);
-		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-
-		glEnable(GL_DEPTH_TEST);
-		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-		glStencilMask(0x00); // make sure we don't update the stencil buffer while drawing the floor
-		glStencilMask(0xFF);
-
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
 		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-14.0f, 8.0f, 0.0f));
