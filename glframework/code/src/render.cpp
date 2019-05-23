@@ -109,7 +109,7 @@ glm::vec3 centerScene = glm::vec3(0.0f, 20.0f, 0.0f);
 int camera = 0;
 float distanceCenter = 16.6f;
 float distanceCabin = (2 * 3.1415) / NUM_CABIN;
-float speedMultiplayer = 0.5f;
+float speedMultiplayer = 0;
 bool focusTrump = false;
 
 //Exercise variables
@@ -123,6 +123,7 @@ int GetExercise()
 	return exercise;
 }int timer = 0;
 
+float LineThickness = 0;
 
 void GUI() {
 	bool show = true;
@@ -130,14 +131,8 @@ void GUI() {
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
-	//ImGui::DragFloat3("Pos Trump", &centerTrump.x);
-	//ImGui::DragFloat3("Pos Pollo", &centerChicken.x);
-	//ImGui::DragFloat3("Pos Cabina", &centerCabine.x);
-	//ImGui::DragFloat3("Feet Wheel", &centerFeetWheel.x);
-
-	/*ImGui::DragFloat("PosCenter", &distanceCenter, 0.1f);*/
 	ImGui::DragFloat("Speed", &speedMultiplayer, 0.1f);
-
+	ImGui::DragFloat("Line Thickness", &LineThickness, 0.1f);
 	ImGui::DragFloat("Moon Strengt", &ambientStrength, 0.1f);
 	ImGui::DragFloat("Bulb Strength", &specularStrength, 0.1f);
 	ImGui::DragFloat("Shininess", &shininess, 0.1f);
@@ -150,19 +145,11 @@ void GUI() {
 	ImGui::DragFloat3("View Pos", &ViewPos.x);
 	ImGui::DragFloat3("Camera Position", { cameraOptions->CameraPosition }, 0.05f);
 
-	/*if (ImGui::Button("Modelos")) {
-		modelsUp = !modelsUp;
-	}
-
-	if (ImGui::Button("Exercice")) {
-		if (exercise == 2)
-			exercise = 0;
+	if (ImGui::Button("Camera")) {
+		if (camera == 3)
+			camera = 0;
 		else
-			exercise++;
-	}*/
-
-	if (ImGui::Button("Start Dolly Zoom")) {
-		cameraOptions->DollyZoom = !cameraOptions->DollyZoom;
+			camera++;
 	}
 
 	if (ImGui::Button("Reset Simulation"))
@@ -372,32 +359,8 @@ void GLcleanup() {
 void GLrender(float dt) {
 	cT = (double)SDL_GetTicks() / 1000.0;;
 
-
 	//Igualamos el tiempo (que se cuenta durante la ejecucion del programa) al contador de tiempo de la camara
 	cameraOptions->t = dt;
-
-	//Ponemos en practica la formula matematica del Dolly Zoom para conseguir la distancia entre el objeto y la camara
-	cameraOptions->d = cameraOptions->width / (2 * glm::tan(FOV / 2));
-
-	if (cameraOptions->DollyZoom) {
-		//Multiplicamos el tiempo que ha pasado por la distancia entre el objeto y la camara 
-		//Seguidamente lo igualamos a la posicion de la camara en Z para realizar el zoom de forma dinamica
-		//Al final dividimos todo esto entro 2 para que la camara se mantenga cerca del modelo en la relacion al tama�o de la ventana 
-		cameraOptions->CameraPosition[2] = (-cameraOptions->t*cameraOptions->d) / 2;
-
-		//"Abrimos" el FOV o lo "cerramos" mientras realizamos el zoom 
-		if (cameraOptions->DollyLoop) {
-			FOV -= 0.03f;
-			if (FOV < 0.5f)
-				cameraOptions->DollyLoop = false;
-		}
-		else
-		{
-			FOV += 0.03f;
-			if (FOV > 2.5f)
-				cameraOptions->DollyLoop = true;
-		}
-	}
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -457,36 +420,18 @@ void GLrender(float dt) {
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
-
-
-	//Realiazmos las transformaciones necesarias para colocar la camara delante de nuestro modelo
-	//RV::_modelView = glm::mat4(1.f);
-
-	//RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
-	//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
-	//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
-
-
-	//Realizamos la proyeccion respecto al FOV. Este varia durante el dolly zoom, de esta manera creamos ese efecto optico.
-	RV::_projection = glm::perspective(FOV, (float)cameraOptions->width / (float)cameraOptions->height, RV::zNear, RV::zFar);
-
 	//Renderizamos los modelos 
-
 	glm::mat4 model;
-	//std::cout << exercise << std::endl;
 	switch (exercise) {
 	case 0:
 		if (modelsUp)
 		{
-			//glm::vec3 centerTrump = glm::vec3(-16.8f, 30.7f, 0.0f);
-			//glm::vec3 centerChicken = glm::vec3(-16.3f, 30.5f, 0.0f);
-
 			//Trump
 			model = glm::mat4(1.0);
 			model = glm::translate(model, centerScene);
 			model = glm::translate(model, glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.5f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 2.9f, 0));
 			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(0.01f));
+			model = glm::scale(model, glm::vec3(0.5f));
 			Trump::updateModel(model);
 			Trump::drawModel();
 
@@ -495,7 +440,7 @@ void GLrender(float dt) {
 			model = glm::translate(model, centerScene);
 			model = glm::translate(model, glm::vec3(distanceCenter * cos((float)(cT * speedMultiplayer + distanceCabin)) - 0.4f, distanceCenter * sin((float)(cT*speedMultiplayer + distanceCabin)) - 2.8f, 0));
 			model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(0.015f));
+			model = glm::scale(model, glm::vec3(0.2f));
 			Chicken::updateModel(model);
 			Chicken::drawModel();
 
@@ -1597,7 +1542,6 @@ namespace Wheel {
 		Normal = in_Normal; \n\
 	}";
 
-
 	const char* model_fragShader =
 		"#version 330\n\
 	in vec4 vert_Normal;\n\
@@ -1612,7 +1556,11 @@ namespace Wheel {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
+	uniform int use_sten;\n\
+	uniform vec4 OutlineColor;\n\
 	void main() {\n\
+		if (use_sten == 1) {\n\
+			out_Color = OutlineColor;\n\
 		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
 		vec3 ambient = ambientStrength * LightColor;\n\
 		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
@@ -1682,7 +1630,7 @@ namespace Wheel {
 		objMat = transform;
 	}
 	void drawModel() {
-
+	
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
 
@@ -1697,6 +1645,21 @@ namespace Wheel {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		
+		glStencilFunc(GL_ALWAYS, 1, 0xFF);
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+		glStencilMask(0xFF);
+		glClear(GL_STENCIL_BUFFER_BIT);
+
+		glDrawArrays(GL_TRIANGLES, 0, 100000);
+
+		glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+		glStencilMask(0x00);
+		glDepthMask(GL_FALSE);
+
+		glUniform4f(glGetUniformLocation(modelProgram, "OutlineColor"), 0.8f, 0.1f, 0.1f, 1.f);
+		glUniform1i(glGetUniformLocation(modelProgram, "use_sten"), 1);
+
 		glDrawArrays(GL_TRIANGLES, 0, 100000);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -1723,3 +1686,5 @@ namespace Wheel {
 
 	}
 }
+
+
