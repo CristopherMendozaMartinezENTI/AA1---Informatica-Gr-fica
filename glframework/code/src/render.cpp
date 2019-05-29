@@ -1,4 +1,4 @@
-#include <GL\glew.h>
+﻿#include <GL\glew.h>
 #include <glm\gtc\type_ptr.hpp>
 #include <glm\gtc\matrix_transform.hpp>
 #include <cstdio>
@@ -80,14 +80,13 @@ bool show_test_window = false;
 bool modelsUp = true;
 //Variables que utilizaremos en la interfaz de usuario
 glm::vec3 LightColor(0.4f, 0.4f, 0.8f);
-glm::vec3 LightColorBulp(1.f, 1.f, 0.f);
 glm::vec3 ObjectColor(0.8f, 0.8f, 0.8f);
 glm::vec3 ObjectColorTrump(1.f, 0., 0.f);
 glm::vec3 ObjectColorChicken(1.f, 1.f, 0.f);
 glm::vec3 lightPos(-10.0f, 40.0f, -10.0f);
 glm::vec3 ViewPos(0.0f, 0.0f, 0.0f);
-float ambientStrength = 1.f;
-float specularStrength = 1.f;
+float ambientStrength = 1.8f;
+float specularStrength = 35.3f;
 float shininess = 32.f;
 float FOV = glm::radians(50.f);
 
@@ -109,7 +108,7 @@ glm::vec3 centerScene = glm::vec3(0.0f, 20.0f, 0.0f);
 int camera = 0;
 float distanceCenter = 16.6f;
 float distanceCabin = (2 * 3.1415) / NUM_CABIN;
-float speedMultiplayer = 0;
+float speedMultiplayer = 0.5f;
 bool focusTrump = false;
 
 //Exercise variables
@@ -123,7 +122,6 @@ int GetExercise()
 	return exercise;
 }int timer = 0;
 
-float LineThickness = 0;
 
 void GUI() {
 	bool show = true;
@@ -131,25 +129,37 @@ void GUI() {
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);//FrameRate
 
+	//ImGui::DragFloat3("Pos Trump", &centerTrump.x);
+	//ImGui::DragFloat3("Pos Pollo", &centerChicken.x);
+	//ImGui::DragFloat3("Pos Cabina", &centerCabine.x);
+	//ImGui::DragFloat3("Feet Wheel", &centerFeetWheel.x);
+
+	ImGui::DragFloat("PosCenter", &distanceCenter, 0.1f);
 	ImGui::DragFloat("Speed", &speedMultiplayer, 0.1f);
-	ImGui::DragFloat("Line Thickness", &LineThickness, 0.1f);
-	ImGui::DragFloat("Moon Strengt", &ambientStrength, 0.1f);
-	ImGui::DragFloat("Bulb Strength", &specularStrength, 0.1f);
+
+	ImGui::DragFloat("Ambient Strength", &ambientStrength, 0.1f);
+	ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
 	ImGui::DragFloat("Shininess", &shininess, 0.1f);
 	ImGui::ColorEdit3("Light Color", &LightColor.x);
-	ImGui::ColorEdit3("Light Color Bulb", &LightColorBulp.x);
 	ImGui::ColorEdit3("Model Color Assets", &ObjectColor.x);
 	ImGui::ColorEdit3("Model Color Trump", &ObjectColorTrump.x);
 	ImGui::ColorEdit3("Model Color Chicken", &ObjectColorChicken.x);
-	ImGui::DragFloat3("Moon Pos", &lightPos.x);
+	ImGui::DragFloat3("Light Pos", &lightPos.x);
 	ImGui::DragFloat3("View Pos", &ViewPos.x);
 	ImGui::DragFloat3("Camera Position", { cameraOptions->CameraPosition }, 0.05f);
 
-	if (ImGui::Button("Camera")) {
-		if (camera == 3)
-			camera = 0;
+	if (ImGui::Button("Modelos")) {
+		modelsUp = !modelsUp;
+	}
+
+	if (ImGui::Button("Exercice")) {
+		if (exercise == 2)
+			exercise = 0;
 		else
-			camera++;
+			exercise++;
+	}
+	if (ImGui::Button("Start Dolly Zoom")) {
+		cameraOptions->DollyZoom = !cameraOptions->DollyZoom;
 	}
 
 	if (ImGui::Button("Reset Simulation"))
@@ -205,10 +215,11 @@ namespace Box {
 namespace Cube {
 	void setupCube();
 	void cleanupCube();
-	void drawMoon();
-	void drawBulb();
+	void drawCube();
 	void drawTrump();
 	void drawChicken();
+
+	void draw2CubesMore();
 	void updateCube(const glm::mat4& transform);
 
 }
@@ -353,15 +364,39 @@ void GLcleanup() {
 	FeetWheel::cleanupModel();
 	Wheel::cleanupModel();
 	Cube::cleanupCube();
-//	camera = 0;
+	//	camera = 0;
 }
 
 
 void GLrender(float dt) {
 	cT = (double)SDL_GetTicks() / 1000.0;;
 
+
 	//Igualamos el tiempo (que se cuenta durante la ejecucion del programa) al contador de tiempo de la camara
 	cameraOptions->t = dt;
+
+	//Ponemos en practica la formula matematica del Dolly Zoom para conseguir la distancia entre el objeto y la camara
+	cameraOptions->d = cameraOptions->width / (2 * glm::tan(FOV / 2));
+
+	if (cameraOptions->DollyZoom) {
+		//Multiplicamos el tiempo que ha pasado por la distancia entre el objeto y la camara 
+		//Seguidamente lo igualamos a la posicion de la camara en Z para realizar el zoom de forma dinamica
+		//Al final dividimos todo esto entro 2 para que la camara se mantenga cerca del modelo en la relacion al tama�o de la ventana 
+		cameraOptions->CameraPosition[2] = (-cameraOptions->t*cameraOptions->d) / 2;
+
+		//"Abrimos" el FOV o lo "cerramos" mientras realizamos el zoom 
+		if (cameraOptions->DollyLoop) {
+			FOV -= 0.03f;
+			if (FOV < 0.5f)
+				cameraOptions->DollyLoop = false;
+		}
+		else
+		{
+			FOV += 0.03f;
+			if (FOV > 2.5f)
+				cameraOptions->DollyLoop = true;
+		}
+	}
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -410,8 +445,23 @@ void GLrender(float dt) {
 
 	RV::_MVP = RV::_projection * RV::_modelView;
 
+
+
+	//Realiazmos las transformaciones necesarias para colocar la camara delante de nuestro modelo
+	//RV::_modelView = glm::mat4(1.f);
+
+	//RV::_modelView = glm::translate(RV::_modelView, glm::vec3(cameraOptions->CameraPosition[0], cameraOptions->CameraPosition[1], cameraOptions->CameraPosition[2]));
+	//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[1], glm::vec3(1.f, 0.f, 0.f));
+	//RV::_modelView = glm::rotate(RV::_modelView, RV::rota[0], glm::vec3(0.f, 1.f, 0.f));
+
+
+	//Realizamos la proyeccion respecto al FOV. Este varia durante el dolly zoom, de esta manera creamos ese efecto optico.
+	RV::_projection = glm::perspective(FOV, (float)cameraOptions->width / (float)cameraOptions->height, RV::zNear, RV::zFar);
+
 	//Renderizamos los modelos 
+
 	glm::mat4 model;
+	//std::cout << exercise << std::endl;
 	switch (exercise) {
 	case 0:
 		if (modelsUp)
@@ -421,7 +471,7 @@ void GLrender(float dt) {
 			model = glm::translate(model, centerScene);
 			model = glm::translate(model, glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.6f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 3.3f, 0));
 			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(0.5f));
+			model = glm::scale(model, glm::vec3(0.01f));
 			Trump::updateModel(model);
 			Trump::drawModel();
 
@@ -430,10 +480,9 @@ void GLrender(float dt) {
 			model = glm::translate(model, centerScene);
 			model = glm::translate(model, glm::vec3(distanceCenter * cos((float)(cT * speedMultiplayer + distanceCabin)) - 0.6f, distanceCenter * sin((float)(cT*speedMultiplayer + distanceCabin)) - 2.8f, 0));
 			model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			model = glm::scale(model, glm::vec3(0.2f));
+			model = glm::scale(model, glm::vec3(0.015f));
 			Chicken::updateModel(model);
 			Chicken::drawModel();
-
 
 			//Feet Wheel
 			model = glm::mat4(1.0);
@@ -454,8 +503,8 @@ void GLrender(float dt) {
 
 			//Wheel
 			model = glm::mat4(1.0);
-			model = glm::translate(model, glm::vec3(centerScene.x, ((centerScene.y - centerScene.y)+2) + centerCabine.y, centerScene.z));
-			model = glm::rotate(model, ((float )cT * speedMultiplayer), glm::vec3(0.0f, 0.0f, 1.0f));
+			model = glm::translate(model, glm::vec3(centerScene.x, ((centerScene.y - centerScene.y) + 2) + centerCabine.y, centerScene.z));
+			model = glm::rotate(model, ((float)cT * speedMultiplayer), glm::vec3(0.0f, 0.0f, 1.0f));
 			model = glm::scale(model, glm::vec3(0.5f));
 			Wheel::updateModel(model);
 			Wheel::drawModel();
@@ -485,6 +534,7 @@ void GLrender(float dt) {
 				model = glm::translate(model, glm::vec3(distanceCenter*cos((float)(cT*speedMultiplayer + distanceCabin * i)), distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin * i), 0));
 				model = glm::scale(model, glm::vec3(2.0f));
 				Cube::updateCube(model);
+				Cube::draw2CubesMore();
 			}
 		}
 		break;
@@ -494,8 +544,7 @@ void GLrender(float dt) {
 		break;
 	}
 
-	Cube::drawMoon();
-	Cube::drawBulb();
+	Cube::drawCube();
 	ImGui::Render();
 }
 
@@ -760,7 +809,7 @@ namespace Cube
 		objMat = transform;
 	}
 
-	void drawMoon() {
+	void drawCube() {
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
@@ -771,27 +820,6 @@ namespace Cube
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		glUniform4f(glGetUniformLocation(cubeProgram, "color"), LightColor.x, LightColor.y, LightColor.z, 1);
-		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
-
-		glUseProgram(0);
-		glBindVertexArray(0);
-		glDisable(GL_PRIMITIVE_RESTART);
-	}
-
-	void drawBulb() {
-		glEnable(GL_PRIMITIVE_RESTART);
-		glBindVertexArray(cubeVao);
-		glUseProgram(cubeProgram);
-		glm::mat4 model = glm::mat4(1.0);
-		model = glm::translate(model, centerScene);
-		model = glm::translate(model, glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.4f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 1.2f, 0));
-		ViewPos = glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.4f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 1.2f, 0);
-		model = glm::scale(model, glm::vec3(0.2f));
-		objMat = model;
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		glUniform4f(glGetUniformLocation(cubeProgram, "color"), LightColorBulp.x, LightColorBulp.y, LightColorBulp.z, 1);
 		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
 
 		glUseProgram(0);
@@ -818,6 +846,24 @@ namespace Cube
 	}
 
 	void drawTrump() {
+		glEnable(GL_PRIMITIVE_RESTART);
+		glBindVertexArray(cubeVao);
+		glUseProgram(cubeProgram);
+
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform4f(glGetUniformLocation(cubeProgram, "color"), 0.1f, 1.f, 1.f, 0.f);
+		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
+
+		//glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
+		glUseProgram(0);
+		glBindVertexArray(0);
+		glDisable(GL_PRIMITIVE_RESTART);
+	}
+
+	void draw2CubesMore() {
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
 		glUseProgram(cubeProgram);
@@ -975,7 +1021,6 @@ namespace Chicken {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
-	uniform vec3 LightColorBulp; \n\
 	void main() {\n\
 		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
 		vec3 ambient = ambientStrength * LightColor;\n\
@@ -996,7 +1041,7 @@ namespace Chicken {
 		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
 		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
 		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColorBulp; \n\
+		vec3 specular = specularStrength * spec * LightColor; \n\
 		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
 		vec3 result = (ambient + diffuse) * ObjectColor; \n\
 		out_Color = vec4(result, 1.0); \n\
@@ -1049,6 +1094,10 @@ namespace Chicken {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
+
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 10.0f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.1, 0.1f, 0.1f));
+		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -1057,7 +1106,6 @@ namespace Chicken {
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColorChicken.x, ObjectColorChicken.y, ObjectColorChicken.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColorBulb"), LightColorBulp.x, LightColorBulp.y, LightColorBulp.z);
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
@@ -1065,6 +1113,27 @@ namespace Chicken {
 		glUseProgram(0);
 		glBindVertexArray(0);
 	}
+
+	void drawModel2() {
+
+		glBindVertexArray(modelVao);
+		glUseProgram(modelProgram);
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
+		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
+		glUseProgram(0);
+		glBindVertexArray(0);
+	}
+
 }
 
 ////////////////////////////////////////////////// MyModel2
@@ -1108,7 +1177,6 @@ namespace Trump {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
-	uniform vec3 LightColorBulb; \n\
 	void main() {\n\
 		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
 		vec3 ambient = ambientStrength * LightColor;\n\
@@ -1129,7 +1197,7 @@ namespace Trump {
 		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
 		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
 		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColorBulb; \n\
+		vec3 specular = specularStrength * spec * LightColor; \n\
 		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
 		vec3 result = (ambient + diffuse) * ObjectColor; \n\
 		out_Color = vec4(result, 1.0); \n\
@@ -1137,7 +1205,7 @@ namespace Trump {
 
 	void setupModel() {
 		glEnable(GL_STENCIL_TEST);
-		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); 
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
 		glGenVertexArrays(1, &modelVao);
 		glBindVertexArray(modelVao);
@@ -1184,6 +1252,9 @@ namespace Trump {
 	void drawModel() {
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-14.0f, 8.0f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.05, 0.05f, 0.05f));
+		//objMat = t1 * s1;
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
@@ -1192,7 +1263,6 @@ namespace Trump {
 		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColorTrump.x, ObjectColorTrump.y, ObjectColorTrump.z);
 		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColorBulb"), LightColorBulp.x, LightColorBulp.y, LightColorBulp.z);
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
@@ -1200,6 +1270,28 @@ namespace Trump {
 		glUseProgram(0);
 		glBindVertexArray(0);
 	}
+
+	void drawModel2() {
+
+		glBindVertexArray(modelVao);
+		glUseProgram(modelProgram);
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
+		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
+		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
+		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
+		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
+		glUseProgram(0);
+		glBindVertexArray(0);
+
+	}
+
 }
 
 ////////////////////////////////////////////////// MyModel3
@@ -1314,25 +1406,6 @@ namespace Cabin {
 	}
 
 	void drawModel() {
-		glBindVertexArray(modelVao);
-		glUseProgram(modelProgram);
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
-		glDrawArrays(GL_TRIANGLES, 0, 50000);
-		glUseProgram(0);
-		glBindVertexArray(0);
-	}
-
-	void drawModel2() {
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
@@ -1532,6 +1605,7 @@ namespace Wheel {
 		Normal = in_Normal; \n\
 	}";
 
+
 	const char* model_fragShader =
 		"#version 330\n\
 	in vec4 vert_Normal;\n\
@@ -1546,11 +1620,7 @@ namespace Wheel {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
-	uniform int use_sten;\n\
-	uniform vec4 OutlineColor;\n\
 	void main() {\n\
-		if (use_sten == 1) {\n\
-			out_Color = OutlineColor;\n\
 		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
 		vec3 ambient = ambientStrength * LightColor;\n\
 		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
@@ -1620,7 +1690,7 @@ namespace Wheel {
 		objMat = transform;
 	}
 	void drawModel() {
-	
+
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
 
@@ -1635,21 +1705,6 @@ namespace Wheel {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
-		
-		glStencilFunc(GL_ALWAYS, 1, 0xFF);
-		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-		glStencilMask(0xFF);
-		glClear(GL_STENCIL_BUFFER_BIT);
-
-		glDrawArrays(GL_TRIANGLES, 0, 100000);
-
-		glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-		glStencilMask(0x00);
-		glDepthMask(GL_FALSE);
-
-		glUniform4f(glGetUniformLocation(modelProgram, "OutlineColor"), 0.8f, 0.1f, 0.1f, 1.f);
-		glUniform1i(glGetUniformLocation(modelProgram, "use_sten"), 1);
-
 		glDrawArrays(GL_TRIANGLES, 0, 100000);
 		glUseProgram(0);
 		glBindVertexArray(0);
@@ -1676,5 +1731,3 @@ namespace Wheel {
 
 	}
 }
-
-
