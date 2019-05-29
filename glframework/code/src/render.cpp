@@ -158,12 +158,6 @@ void GUI() {
 		else
 			exercise++;
 	}
-	if (ImGui::Button("Camera")) {
-		if (camera == 3)
-			camera = 0;
-		else
-			camera++;
-	}
 	if (ImGui::Button("Start Dolly Zoom")) {
 		cameraOptions->DollyZoom = !cameraOptions->DollyZoom;
 	}
@@ -370,6 +364,7 @@ void GLcleanup() {
 	FeetWheel::cleanupModel();
 	Wheel::cleanupModel();
 	Cube::cleanupCube();
+//	camera = 0;
 }
 
 
@@ -423,12 +418,16 @@ void GLrender(float dt) {
 
 		RV::_modelView = glm::translate(RV::_modelView, glm::vec3(0.0f, -20.0f, -70.0f));
 		RV::_modelView = glm::rotate(RV::_modelView, glm::radians(45.0f), glm::vec3(0.f, 1.f, 0.f));
+
+		if (timer + 2 < cT)
+		{
+			timer = cT;
+			camera++;
+		}
 		break;
 	case 1:
-		timer += cT;
-		if (timer / 100 > 4+cT)
-		{
-			timer = 0;
+		if (timer + 1 < cT) {
+			timer = cT;
 			focusTrump = !focusTrump;
 		}
 		if (focusTrump)
@@ -441,21 +440,6 @@ void GLrender(float dt) {
 			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)cT*speedMultiplayer + distanceCabin) + 1.2, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) + 18, 0);
 			RV::_modelView = glm::lookAt(camaraTrumpChicken, glm::vec3(camaraTrumpChicken.x - 1, camaraTrumpChicken.y, camaraTrumpChicken.z), glm::vec3(0.0, 1.0, 0.0));
 		}
-		break;
-	case 2:
-		focusCabin = glm::vec3(distanceCenter*cos((float)cT*speedMultiplayer + distanceCabin), distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) + 20, 0);
-		RV::_modelView = glm::lookAt(glm::vec3(focusCabin.x, focusCabin.y, focusCabin.z - 10), focusCabin, glm::vec3(0.0, 1.0, 0.0));
-		break;
-	case 3:
-		glm::mat4 matrix;
-		focusCabin = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin), distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
-		glm::vec3 focusCamara = glm::vec3(focusCabin.x, focusCabin.y - 10, focusCabin.z);
-		focusCabin = glm::vec3(focusCabin.x, focusCabin.y + 0.5, focusCabin.z);
-		matrix = glm::translate(matrix, focusCabin);
-		matrix = glm::rotate(matrix, (float)dt, glm::vec3(0.0, 1.0, 0.0));
-		glm::vec4 aux = glm::vec4(1.0);
-		aux = matrix * aux;
-		RV::_modelView = glm::lookAt(glm::vec3(aux.x, aux.y, aux.z), focusCamara, glm::vec3(0.0, 1.0, 0.0));
 		break;
 	}
 
