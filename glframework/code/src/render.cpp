@@ -353,6 +353,7 @@ void GLcleanup() {
 	FeetWheel::cleanupModel();
 	Wheel::cleanupModel();
 	Cube::cleanupCube();
+//	camera = 0;
 }
 
 
@@ -382,39 +383,28 @@ void GLrender(float dt) {
 
 		RV::_modelView = glm::translate(RV::_modelView, glm::vec3(0.0f, -20.0f, -70.0f));
 		RV::_modelView = glm::rotate(RV::_modelView, glm::radians(45.0f), glm::vec3(0.f, 1.f, 0.f));
+
+		if (timer + 2 < cT)
+		{
+			timer = cT;
+			camera++;
+		}
 		break;
 	case 1:
-		timer += dt;
-		if (timer / 100 > 4)
-		{
-			timer = 0;
+		if (timer + 1 < cT) {
+			timer = cT;
 			focusTrump = !focusTrump;
 		}
 		if (focusTrump)
 		{
-			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) - 1, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
+			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)cT*speedMultiplayer + distanceCabin) - 1, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) + 18.2, 0);
 			RV::_modelView = glm::lookAt(camaraTrumpChicken, glm::vec3(camaraTrumpChicken.x + 1, camaraTrumpChicken.y, camaraTrumpChicken.z), glm::vec3(0.0, 1.0, 0.0));
 		}
 		else
 		{
-			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin) + 1.5, distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 19, 0);
+			camaraTrumpChicken = glm::vec3(distanceCenter*cos((float)cT*speedMultiplayer + distanceCabin) + 1, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) + 18, 0);
 			RV::_modelView = glm::lookAt(camaraTrumpChicken, glm::vec3(camaraTrumpChicken.x - 1, camaraTrumpChicken.y, camaraTrumpChicken.z), glm::vec3(0.0, 1.0, 0.0));
 		}
-		break;
-	case 2:
-		focusCabin = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin), distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
-		RV::_modelView = glm::lookAt(glm::vec3(focusCabin.x, focusCabin.y, focusCabin.z - 10), focusCabin, glm::vec3(0.0, 1.0, 0.0));
-		break;
-	case 3:
-		glm::mat4 matrix;
-		focusCabin = glm::vec3(distanceCenter*cos((float)dt*speedMultiplayer + distanceCabin), distanceCenter *sin((float)dt*speedMultiplayer + distanceCabin) + 20, 0);
-		glm::vec3 focusCamara = glm::vec3(focusCabin.x, focusCabin.y - 10, focusCabin.z);
-		focusCabin = glm::vec3(focusCabin.x, focusCabin.y + 0.5, focusCabin.z);
-		matrix = glm::translate(matrix, focusCabin);
-		matrix = glm::rotate(matrix, (float)dt, glm::vec3(0.0, 1.0, 0.0));
-		glm::vec4 aux = glm::vec4(1.0);
-		aux = matrix * aux;
-		RV::_modelView = glm::lookAt(glm::vec3(aux.x, aux.y, aux.z), focusCamara, glm::vec3(0.0, 1.0, 0.0));
 		break;
 	}
 
@@ -429,7 +419,7 @@ void GLrender(float dt) {
 			//Trump
 			model = glm::mat4(1.0);
 			model = glm::translate(model, centerScene);
-			model = glm::translate(model, glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.5f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 2.9f, 0));
+			model = glm::translate(model, glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.6f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 3.3f, 0));
 			model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 			model = glm::scale(model, glm::vec3(0.5f));
 			Trump::updateModel(model);
@@ -438,7 +428,7 @@ void GLrender(float dt) {
 			//Chicken
 			model = glm::mat4(1.0);
 			model = glm::translate(model, centerScene);
-			model = glm::translate(model, glm::vec3(distanceCenter * cos((float)(cT * speedMultiplayer + distanceCabin)) - 0.4f, distanceCenter * sin((float)(cT*speedMultiplayer + distanceCabin)) - 2.8f, 0));
+			model = glm::translate(model, glm::vec3(distanceCenter * cos((float)(cT * speedMultiplayer + distanceCabin)) - 0.6f, distanceCenter * sin((float)(cT*speedMultiplayer + distanceCabin)) - 2.8f, 0));
 			model = glm::rotate(model, glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 			model = glm::scale(model, glm::vec3(0.2f));
 			Chicken::updateModel(model);
