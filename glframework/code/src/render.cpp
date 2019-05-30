@@ -83,6 +83,7 @@ glm::vec3 LightColor(0.4f, 0.4f, 0.8f);
 glm::vec3 ObjectColor(0.8f, 0.8f, 0.8f);
 glm::vec3 ObjectColorTrump(1.f, 0., 0.f);
 glm::vec3 ObjectColorChicken(1.f, 1.f, 0.f);
+glm::vec3 LightColorBulp(1.f, 1.f, 0.f);
 glm::vec3 lightPos(-10.0f, 40.0f, -10.0f);
 glm::vec3 ViewPos(0.0f, 0.0f, 0.0f);
 float ambientStrength = 1.8f;
@@ -141,6 +142,7 @@ void GUI() {
 	ImGui::DragFloat("Specular Strength", &specularStrength, 0.1f);
 	ImGui::DragFloat("Shininess", &shininess, 0.1f);
 	ImGui::ColorEdit3("Light Color", &LightColor.x);
+	ImGui::ColorEdit3("Light Color Bulb", &LightColorBulp.x);
 	ImGui::ColorEdit3("Model Color Assets", &ObjectColor.x);
 	ImGui::ColorEdit3("Model Color Trump", &ObjectColorTrump.x);
 	ImGui::ColorEdit3("Model Color Chicken", &ObjectColorChicken.x);
@@ -218,7 +220,7 @@ namespace Cube {
 	void drawCube();
 	void drawTrump();
 	void drawChicken();
-
+	void drawBulb();
 	void draw2CubesMore();
 	void updateCube(const glm::mat4& transform);
 
@@ -381,7 +383,7 @@ void GLrender(float dt) {
 	if (cameraOptions->DollyZoom) {
 		//Multiplicamos el tiempo que ha pasado por la distancia entre el objeto y la camara 
 		//Seguidamente lo igualamos a la posicion de la camara en Z para realizar el zoom de forma dinamica
-		//Al final dividimos todo esto entro 2 para que la camara se mantenga cerca del modelo en la relacion al tama�o de la ventana 
+		//Al final dividimos todo esto entro 2 para que la camara se mantenga cerca del modelo en la relacion al tama?o de la ventana 
 		cameraOptions->CameraPosition[2] = (-cameraOptions->t*cameraOptions->d) / 2;
 
 		//"Abrimos" el FOV o lo "cerramos" mientras realizamos el zoom 
@@ -422,7 +424,7 @@ void GLrender(float dt) {
 		if (timer + 2 < cT)
 		{
 			timer = cT;
-			camera++;
+			//camera++;
 		}
 		break;
 	case 1:
@@ -545,6 +547,7 @@ void GLrender(float dt) {
 	}
 
 	Cube::drawCube();
+	Cube::drawBulb();
 	ImGui::Render();
 }
 
@@ -827,6 +830,28 @@ namespace Cube
 		glDisable(GL_PRIMITIVE_RESTART);
 	}
 
+	void drawBulb() {
+		glEnable(GL_PRIMITIVE_RESTART);
+		glBindVertexArray(cubeVao);
+		glUseProgram(cubeProgram);
+		glm::mat4 model = glm::mat4(1.0);
+		model = glm::translate(model, centerScene);
+		model = glm::translate(model, glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.4f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 1.2f, 0));
+		ViewPos = glm::vec3(distanceCenter*cos((float)cT * speedMultiplayer + distanceCabin) + 0.4f, distanceCenter *sin((float)cT*speedMultiplayer + distanceCabin) - 1.2f, 0);
+		model = glm::scale(model, glm::vec3(0.2f));
+		objMat = model;
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
+		glUniformMatrix4fv(glGetUniformLocation(cubeProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
+		glUniform4f(glGetUniformLocation(cubeProgram, "color"), LightColorBulp.x, LightColorBulp.y, LightColorBulp.z, 1);
+		glDrawElements(GL_TRIANGLE_STRIP, numVerts, GL_UNSIGNED_BYTE, 0);
+
+		glUseProgram(0);
+		glBindVertexArray(0);
+		glDisable(GL_PRIMITIVE_RESTART);
+	}
+
+
 	void drawChicken() {
 		glEnable(GL_PRIMITIVE_RESTART);
 		glBindVertexArray(cubeVao);
@@ -1021,30 +1046,36 @@ namespace Chicken {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
+	uniform int outline; \n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		if(outline == 1){ \n\
+			out_Color =  vec4(0,0,0,1.0);\n\
+		}\n\
+		else{\n\
+			//Realizamos los calculos necesarios para conseguir luz ambiente \n\
+			vec3 ambient = ambientStrength * LightColor;\n\
+			//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
+			vec3 norm = normalize(Normal); \n\
+			vec3 lightDir = normalize(lightPos - FragPos); \n\
+			float diff = max(dot(norm, lightDir), 0.0); \n\
+			if(diff < 0.2) diff = 0;\n\
+			if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
+			if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
+			if(diff >= 0.5) diff = 1;\n\
+			vec3 diffuse = diff * LightColor; \n\
+			//Realizamos los calculos necesarios para conseguir luz especular \n\
+			vec3 viewDir = normalize(viewPos - FragPos); \n\
+ 			vec3 reflectDir = reflect(-lightDir, norm);	\n\
+			float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
+			if(spec < 0.2) spec = 0;\n\
+			if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
+			if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
+			if(spec >= 0.5) spec = 1;\n\
+			vec3 specular = specularStrength * spec * LightColor; \n\
+			//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
+			vec3 result = (ambient + diffuse) * ObjectColor; \n\
+			out_Color = vec4(result, 1.0); \n\
+		}\n\
 	}";
 
 	void setupModel() {
@@ -1094,31 +1125,11 @@ namespace Chicken {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-
-		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 10.0f, 0.0f));
-		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.1, 0.1f, 0.1f));
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-14.0f, 8.0f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.05, 0.05f, 0.05f));
 		//objMat = t1 * s1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColorChicken.x, ObjectColorChicken.y, ObjectColorChicken.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
-		glDrawArrays(GL_TRIANGLES, 0, 50000);
-		glUseProgram(0);
-		glBindVertexArray(0);
-	}
-
-	void drawModel2() {
-
-		glBindVertexArray(modelVao);
-		glUseProgram(modelProgram);
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glm::mat4 outlineOBJ = glm::scale(objMat, glm::vec3(1.01));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(outlineOBJ));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
@@ -1129,11 +1140,16 @@ namespace Chicken {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 1);
+		glDisable(GL_DEPTH_TEST);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 0);
+		glEnable(GL_DEPTH_TEST);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
 	}
-
 }
 
 ////////////////////////////////////////////////// MyModel2
@@ -1177,30 +1193,36 @@ namespace Trump {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
+	uniform int outline; \n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		if(outline == 1){ \n\
+			out_Color =  vec4(0,0,0,1.0);\n\
+		}\n\
+		else{\n\
+			//Realizamos los calculos necesarios para conseguir luz ambiente \n\
+			vec3 ambient = ambientStrength * LightColor;\n\
+			//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
+			vec3 norm = normalize(Normal); \n\
+			vec3 lightDir = normalize(lightPos - FragPos); \n\
+			float diff = max(dot(norm, lightDir), 0.0); \n\
+			if(diff < 0.2) diff = 0;\n\
+			if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
+			if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
+			if(diff >= 0.5) diff = 1;\n\
+			vec3 diffuse = diff * LightColor; \n\
+			//Realizamos los calculos necesarios para conseguir luz especular \n\
+			vec3 viewDir = normalize(viewPos - FragPos); \n\
+ 			vec3 reflectDir = reflect(-lightDir, norm);	\n\
+			float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
+			if(spec < 0.2) spec = 0;\n\
+			if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
+			if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
+			if(spec >= 0.5) spec = 1;\n\
+			vec3 specular = specularStrength * spec * LightColor; \n\
+			//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
+			vec3 result = (ambient + diffuse) * ObjectColor; \n\
+			out_Color = vec4(result, 1.0); \n\
+		}\n\
 	}";
 
 	void setupModel() {
@@ -1255,7 +1277,8 @@ namespace Trump {
 		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-14.0f, 8.0f, 0.0f));
 		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.05, 0.05f, 0.05f));
 		//objMat = t1 * s1;
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glm::mat4 outlineOBJ = glm::scale(objMat, glm::vec3(1.01));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(outlineOBJ));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
@@ -1266,32 +1289,16 @@ namespace Trump {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 1);
+		glDisable(GL_DEPTH_TEST);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
-		glUseProgram(0);
-		glBindVertexArray(0);
-	}
-
-	void drawModel2() {
-
-		glBindVertexArray(modelVao);
-		glUseProgram(modelProgram);
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 0);
+		glEnable(GL_DEPTH_TEST);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
-
 	}
-
 }
 
 ////////////////////////////////////////////////// MyModel3
@@ -1335,30 +1342,36 @@ namespace Cabin {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
+	uniform int outline; \n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		if(outline == 1){ \n\
+			out_Color =  vec4(0,0,0,1.0);\n\
+		}\n\
+		else{\n\
+			//Realizamos los calculos necesarios para conseguir luz ambiente \n\
+			vec3 ambient = ambientStrength * LightColor;\n\
+			//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
+			vec3 norm = normalize(Normal); \n\
+			vec3 lightDir = normalize(lightPos - FragPos); \n\
+			float diff = max(dot(norm, lightDir), 0.0); \n\
+			if(diff < 0.2) diff = 0;\n\
+			if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
+			if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
+			if(diff >= 0.5) diff = 1;\n\
+			vec3 diffuse = diff * LightColor; \n\
+			//Realizamos los calculos necesarios para conseguir luz especular \n\
+			vec3 viewDir = normalize(viewPos - FragPos); \n\
+ 			vec3 reflectDir = reflect(-lightDir, norm);	\n\
+			float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
+			if(spec < 0.2) spec = 0;\n\
+			if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
+			if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
+			if(spec >= 0.5) spec = 1;\n\
+			vec3 specular = specularStrength * spec * LightColor; \n\
+			//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
+			vec3 result = (ambient + diffuse) * ObjectColor; \n\
+			out_Color = vec4(result, 1.0); \n\
+		}\n\
 	}";
 
 	void setupModel() {
@@ -1408,7 +1421,11 @@ namespace Cabin {
 	void drawModel() {
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-14.0f, 8.0f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.05, 0.05f, 0.05f));
+		//objMat = t1 * s1;
+		glm::mat4 outlineOBJ = glm::scale(objMat, glm::vec3(1.01));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(outlineOBJ));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
@@ -1419,10 +1436,15 @@ namespace Cabin {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 1);
+		glDisable(GL_DEPTH_TEST);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 0);
+		glEnable(GL_DEPTH_TEST);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
-
 	}
 }
 
@@ -1467,30 +1489,36 @@ namespace FeetWheel {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
+	uniform int outline; \n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		if(outline == 1){ \n\
+			out_Color =  vec4(0,0,0,1.0);\n\
+		}\n\
+		else{\n\
+			//Realizamos los calculos necesarios para conseguir luz ambiente \n\
+			vec3 ambient = ambientStrength * LightColor;\n\
+			//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
+			vec3 norm = normalize(Normal); \n\
+			vec3 lightDir = normalize(lightPos - FragPos); \n\
+			float diff = max(dot(norm, lightDir), 0.0); \n\
+			if(diff < 0.2) diff = 0;\n\
+			if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
+			if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
+			if(diff >= 0.5) diff = 1;\n\
+			vec3 diffuse = diff * LightColor; \n\
+			//Realizamos los calculos necesarios para conseguir luz especular \n\
+			vec3 viewDir = normalize(viewPos - FragPos); \n\
+ 			vec3 reflectDir = reflect(-lightDir, norm);	\n\
+			float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
+			if(spec < 0.2) spec = 0;\n\
+			if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
+			if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
+			if(spec >= 0.5) spec = 1;\n\
+			vec3 specular = specularStrength * spec * LightColor; \n\
+			//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
+			vec3 result = (ambient + diffuse) * ObjectColor; \n\
+			out_Color = vec4(result, 1.0); \n\
+		}\n\
 	}";
 
 	void setupModel() {
@@ -1537,11 +1565,13 @@ namespace FeetWheel {
 		objMat = transform;
 	}
 	void drawModel() {
-
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-8.0f, 4.8f, 0.0f));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-14.0f, 8.0f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.05, 0.05f, 0.05f));
+		//objMat = t1 * s1;
+		glm::mat4 outlineOBJ = glm::scale(objMat, glm::vec3(1.01));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(outlineOBJ));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
@@ -1552,30 +1582,15 @@ namespace FeetWheel {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 1);
+		glDisable(GL_DEPTH_TEST);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
-		glUseProgram(0);
-		glBindVertexArray(0);
-	}
-
-	void drawModel2() {
-
-		glBindVertexArray(modelVao);
-		glUseProgram(modelProgram);
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 0);
+		glEnable(GL_DEPTH_TEST);
 		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
-
 	}
 }
 
@@ -1620,30 +1635,36 @@ namespace Wheel {
 	uniform float ambientStrength;\n\
 	uniform float specularStrength; \n\
 	uniform float shininess; \n\
+	uniform int outline; \n\
 	void main() {\n\
-		//Realizamos los calculos necesarios para conseguir luz ambiente \n\
-		vec3 ambient = ambientStrength * LightColor;\n\
-		//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
-		vec3 norm = normalize(Normal); \n\
-		vec3 lightDir = normalize(lightPos - FragPos); \n\
-		float diff = max(dot(norm, lightDir), 0.0); \n\
-		if(diff < 0.2) diff = 0;\n\
-		if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
-		if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
-		if(diff >= 0.5) diff = 1;\n\
-		vec3 diffuse = diff * LightColor; \n\
-		//Realizamos los calculos necesarios para conseguir luz especular \n\
-		vec3 viewDir = normalize(viewPos - FragPos); \n\
- 		vec3 reflectDir = reflect(-lightDir, norm);	\n\
-		float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
-		if(spec < 0.2) spec = 0;\n\
-		if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
-		if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
-		if(spec >= 0.5) spec = 1;\n\
-		vec3 specular = specularStrength * spec * LightColor; \n\
-		//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
-		vec3 result = (ambient + diffuse) * ObjectColor; \n\
-		out_Color = vec4(result, 1.0); \n\
+		if(outline == 1){ \n\
+			out_Color =  vec4(0,0,0,1.0);\n\
+		}\n\
+		else{\n\
+			//Realizamos los calculos necesarios para conseguir luz ambiente \n\
+			vec3 ambient = ambientStrength * LightColor;\n\
+			//Realizamos los calculos necesarios para conseguir ilumacion difusa\n\
+			vec3 norm = normalize(Normal); \n\
+			vec3 lightDir = normalize(lightPos - FragPos); \n\
+			float diff = max(dot(norm, lightDir), 0.0); \n\
+			if(diff < 0.2) diff = 0;\n\
+			if(diff >= 0.2 && diff < 0.4) diff = 0.2; \n\
+			if(diff >= 0.4 && diff < 0.5) diff = 0; \n\
+			if(diff >= 0.5) diff = 1;\n\
+			vec3 diffuse = diff * LightColor; \n\
+			//Realizamos los calculos necesarios para conseguir luz especular \n\
+			vec3 viewDir = normalize(viewPos - FragPos); \n\
+ 			vec3 reflectDir = reflect(-lightDir, norm);	\n\
+			float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); \n\
+			if(spec < 0.2) spec = 0;\n\
+			if(spec >= 0.2 && spec < 0.4) spec = 0; \n\
+			if(spec >= 0.4 && spec < 0.5) spec = 0; \n\
+			if(spec >= 0.5) spec = 1;\n\
+			vec3 specular = specularStrength * spec * LightColor; \n\
+			//Renderizamos el modelo junto a los tres tipos de ilumacion \n\
+			vec3 result = (ambient + diffuse) * ObjectColor; \n\
+			out_Color = vec4(result, 1.0); \n\
+		}\n\
 	}";
 
 	void setupModel() {
@@ -1693,8 +1714,11 @@ namespace Wheel {
 
 		glBindVertexArray(modelVao);
 		glUseProgram(modelProgram);
-
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
+		//glm::mat4 t1 = glm::translate(glm::mat4(), glm::vec3(-14.0f, 8.0f, 0.0f));
+		//glm::mat4 s1 = glm::scale(glm::mat4(), glm::vec3(0.05, 0.05f, 0.05f));
+		//objMat = t1 * s1;
+		glm::mat4 outlineOBJ = glm::scale(objMat, glm::vec3(1.01));
+		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(outlineOBJ));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
 		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
@@ -1705,29 +1729,15 @@ namespace Wheel {
 		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
 		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
-		glDrawArrays(GL_TRIANGLES, 0, 100000);
-		glUseProgram(0);
-		glBindVertexArray(0);
-	}
-
-	void drawModel2() {
-
-		glBindVertexArray(modelVao);
-		glUseProgram(modelProgram);
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 1);
+		glDisable(GL_DEPTH_TEST);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "objMat"), 1, GL_FALSE, glm::value_ptr(objMat));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mv_Mat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_modelView));
-		glUniformMatrix4fv(glGetUniformLocation(modelProgram, "mvpMat"), 1, GL_FALSE, glm::value_ptr(RenderVars::_MVP));
-		//Le pasamos al shader las variables que utlizaremos en la interfaz para que de esta forma se pueda modificar la ilumacion de forma dinamica
-		glUniform3f(glGetUniformLocation(modelProgram, "lightPos"), lightPos.x, lightPos.y, lightPos.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "LightColor"), LightColor.x, LightColor.y, LightColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "ObjectColor"), ObjectColor.x, ObjectColor.y, ObjectColor.z);
-		glUniform3f(glGetUniformLocation(modelProgram, "viewPos"), ViewPos.x, ViewPos.y, ViewPos.z);
-		glUniform1f(glGetUniformLocation(modelProgram, "ambientStrength"), ambientStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "specularStrength"), specularStrength);
-		glUniform1f(glGetUniformLocation(modelProgram, "shininess"), shininess);
-		glDrawArrays(GL_TRIANGLES, 0, 10000);
+		glUniform1i(glGetUniformLocation(modelProgram, "outline"), 0);
+		glEnable(GL_DEPTH_TEST);
+		glDrawArrays(GL_TRIANGLES, 0, 50000);
 		glUseProgram(0);
 		glBindVertexArray(0);
-
 	}
+
 }
